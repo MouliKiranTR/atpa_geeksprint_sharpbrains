@@ -4,6 +4,7 @@ Lucid MCP endpoints for accessing Lucid diagrams via MCP tools
 
 from fastapi import APIRouter, HTTPException
 from typing import Optional
+import base64
 
 from app.models.schemas import (
     MCPListDiagramsRequest,
@@ -12,6 +13,106 @@ from app.models.schemas import (
 from app.services.lucid_service import lucid_service
 
 router = APIRouter()
+
+
+@router.post("/export-and-upload")
+async def export_lucid_and_upload_to_openarena(
+    document_id: str,
+    page_id: Optional[str] = None,
+    format: str = "png",
+    width: Optional[int] = 1920,
+    height: Optional[int] = None
+):
+    """
+    Export a Lucid document as an image and upload it to Open Arena
+    
+    Args:
+        document_id: Lucid document ID to export
+        page_id: Optional specific page to export
+        format: Image format (png, jpg, pdf, svg) - default: png
+        width: Optional width for export - default: 1920
+        height: Optional height for export
+    """
+    if not lucid_service:
+        raise HTTPException(
+            status_code=500,
+            detail="Lucid API key is not configured."
+        )
+    
+    try:
+        # Export the document from Lucid
+        print(f"Exporting Lucid document: {document_id}")
+        export_result = await lucid_service.export_document_image(
+            document_id=document_id,
+            page_id=page_id,
+            format=format,
+            width=width,
+            height=height
+        )
+        
+        if not export_result.get("success"):
+            error_msg = export_result.get('error', 'Unknown error')
+            raise HTTPException(
+                status_code=400,
+                detail=f"Failed to export Lucid document: {error_msg}"
+            )
+        
+        # Get image data and upload to Open Arena
+        image_data = export_result["image_data"]
+        
+        # Import data source service
+        from app.services.data_source_service import data_source_service
+        
+        # Convert image to base64 for upload
+        encoded_content = base64.b64encode(image_data).decode('utf-8')
+        
+        # Create filename
+        ext = f".{format.lower()}"
+        filename = f"lucid_export_{document_id}"
+        if page_id:
+            filename += f"_page_{page_id}"
+        filename += ext
+        
+        # Upload to Open Arena
+        upload_result = await data_source_service.process_file_upload(
+            file_name=filename,
+            file_type=format.lower(),
+            content=encoded_content,
+            description=f"Exported from Lucid document {document_id}"
+        )
+        
+        if not upload_result.get("success"):
+            error_msg = upload_result.get('error', 'Unknown error')
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to upload to Open Arena: {error_msg}"
+            )
+        
+        print(f"Successfully uploaded with file ID: {upload_result['file_id']}")
+        
+        return {
+            "success": True,
+            "message": "Successfully exported and uploaded to Open Arena",
+            "lucid_export": {
+                "document_id": document_id,
+                "page_id": page_id,
+                "format": format,
+                "size": len(image_data)
+            },
+            "openarena_upload": {
+                "file_id": upload_result["file_id"],
+                "filename": filename,
+                "status": "uploaded"
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error during export and upload: {str(e)}"
+        )
 
 
 @router.post("/list-diagrams", response_model=MCPListDiagramsResponse)
@@ -137,6 +238,40 @@ async def search_lucid_diagrams(
             status_code=500,
             detail=f"Error searching Lucid diagrams: {str(e)}"
         )
+
+
+@router.get("/export-help")
+async def get_export_help():
+    """
+    Get help information for using the export functionality
+    """
+    return {
+        "message": "Lucid Export to Open Arena Help",
+        "description": ("This service allows you to export Lucid documents "
+                       "as images and upload them to Open Arena for analysis."),
+        "endpoints": {
+            "/export-and-upload": {
+                "method": "POST",
+                "description": "Export a Lucid document and upload to Open Arena",
+                "required_params": ["document_id"],
+                "optional_params": {
+                    "page_id": "Specific page to export",
+                    "format": "Image format (png, jpg, pdf, svg)",
+                    "width": "Export width in pixels",
+                    "height": "Export height in pixels"
+                }
+            },
+            "/list-diagrams": {
+                "method": "POST", 
+                "description": "List available Lucid diagrams to get document IDs"
+            }
+        },
+        "example_usage": {
+            "step_1": "Use /list-diagrams to find document IDs",
+            "step_2": "Use /export-and-upload with document_id to export and upload"
+        },
+        "supported_formats": ["png", "jpg", "pdf", "svg"]
+    }
 
 
 @router.get("/status")

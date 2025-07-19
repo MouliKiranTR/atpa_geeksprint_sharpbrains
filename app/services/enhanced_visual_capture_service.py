@@ -9,7 +9,7 @@ import httpx
 from typing import Dict, Any, List, Optional
 
 from app.core.config import settings
-
+from app.services.lucid_service import lucid_service
 
 class EnhancedVisualCaptureService:
     """Enhanced service for capturing visual content with file export"""
@@ -52,7 +52,7 @@ class EnhancedVisualCaptureService:
         
         try:
             # Try API export first
-            export_data = await self._create_lucid_export(diagram_id)
+            export_data = await lucid_service.export_document_image(diagram_id)
             
             if export_data and export_data.get("image_data"):
                 # API export successful - save to file

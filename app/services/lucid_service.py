@@ -14,8 +14,11 @@ class LucidService:
     def __init__(self):
         self.api_key = settings.LUCID_API_KEY
         self.base_url = settings.LUCID_API_BASE_URL
-        
-        if not self.api_key:
+        self.is_configured = bool(self.api_key)
+    
+    def _ensure_configured(self):
+        """Ensure the service is properly configured"""
+        if not self.is_configured:
             raise ValueError("LUCID_API_KEY is not configured")
     
     def _get_headers(self) -> Dict[str, str]:
@@ -124,6 +127,7 @@ class LucidService:
         Returns:
             LucidDocumentsResponse containing documents and metadata
         """
+        self._ensure_configured()
         url = f"{self.base_url}/documents/search"
         
         # If using client-side search, get all documents first
@@ -285,6 +289,7 @@ class LucidService:
         Returns:
             LucidDocumentsResponse containing documents and metadata
         """
+        self._ensure_configured()
         url = f"{self.base_url}/documents"
         
         params = {
@@ -390,6 +395,146 @@ class LucidService:
             except Exception as e:
                 print(f"DEBUG: Unexpected error: {str(e)}")
                 raise
+
+    async def export_document_image(
+        self, 
+        document_id: str,
+        page_id: Optional[str] = None,
+        format: str = "png",
+        width: Optional[int] = None,
+        height: Optional[int] = None
+    ) -> Dict[str, any]:
+        """
+        Export a Lucid document as an image using Get/Export Document endpoint
+        
+        Args:
+            document_id: The ID of the document to export
+            page_id: Optional page ID to export specific page
+            format: Image format (png, jpg, pdf, svg)
+            width: Optional width for the image
+            height: Optional height for the image
+            
+        Returns:
+            Dictionary containing success status, image data, and metadata
+        """
+        self._ensure_configured()
+        
+        # Use the Get/Export Document endpoint
+        url = f"{self.base_url}/documents/{document_id}"
+        
+        # Build query parameters for export
+        params = {
+            "exportFormat": format
+        }
+        
+        if page_id:
+            params["pageId"] = page_id
+        
+        if width:
+            params["width"] = width
+            
+        if height:
+            params["height"] = height
+        
+        # Use appropriate Accept header for image format
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Lucid-Api-Version": "1"
+        }
+        
+        if format.lower() == "png":
+            headers["Accept"] = "image/png"
+        elif format.lower() == "jpg" or format.lower() == "jpeg":
+            headers["Accept"] = "image/jpeg"
+        elif format.lower() == "pdf":
+            headers["Accept"] = "application/pdf"
+        elif format.lower() == "svg":
+            headers["Accept"] = "image/svg+xml"
+        else:
+            headers["Accept"] = "image/png"  # Default to PNG
+        
+        print(f"DEBUG: Exporting document {document_id} as {format}")
+        print(f"DEBUG: URL: {url}")
+        print(f"DEBUG: Params: {params}")
+        print(f"DEBUG: Headers: {headers}")
+        
+        async with httpx.AsyncClient(verify=False) as client:
+            try:
+                response = await client.get(
+                    url,
+                    headers=headers,
+                    params=params,
+                    timeout=60.0  # Longer timeout for image export
+                )
+                
+                print(f"DEBUG: Export response status: {response.status_code}")
+                print(f"DEBUG: Export response headers: {dict(response.headers)}")
+                
+                response.raise_for_status()
+                
+                # Check if response is binary (image) data
+                content_type = response.headers.get("content-type", "")
+                is_image = content_type.startswith("image/")
+                is_pdf = content_type == "application/pdf"
+                if is_image or is_pdf:
+                    # Binary image data
+                    image_data = response.content
+                    
+                    return {
+                        "success": True,
+                        "image_data": image_data,
+                        "content_type": content_type,
+                        "format": format,
+                        "size": len(image_data),
+                        "metadata": {
+                            "document_id": document_id,
+                            "page_id": page_id,
+                            "export_format": format,
+                            "content_type": content_type
+                        }
+                    }
+                else:
+                    # Unexpected response type
+                    error_msg = (f"Unexpected content type: {content_type}. "
+                               f"Expected image data.")
+                    return {
+                        "success": False,
+                        "error": error_msg,
+                        "response_text": response.text[:500]
+                    }
+                    
+            except httpx.HTTPStatusError as e:
+                status_code = e.response.status_code
+                print(f"DEBUG: HTTPStatusError - Status: {status_code}")
+                print(f"DEBUG: Response text: {e.response.text}")
+                
+                error_msg = f"Lucid export failed: {status_code}"
+                if status_code == 401:
+                    error_msg = "Invalid Lucid API key or unauthorized access"
+                elif status_code == 403:
+                    error_msg = "Forbidden: Check API key permissions"
+                elif status_code == 404:
+                    error_msg = f"Document {document_id} not found"
+                
+                return {
+                    "success": False,
+                    "error": error_msg,
+                    "status_code": status_code,
+                    "response_text": e.response.text[:500]
+                }
+                
+            except httpx.RequestError as e:
+                print(f"DEBUG: RequestError: {str(e)}")
+                return {
+                    "success": False,
+                    "error": f"Failed to connect to Lucid API: {str(e)}"
+                }
+            except Exception as e:
+                print(f"DEBUG: Unexpected error: {str(e)}")
+                return {
+                    "success": False,
+                    "error": f"Unexpected error during export: {str(e)}"
+                }
 
 
 # Global instance

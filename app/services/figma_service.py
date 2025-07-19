@@ -12,12 +12,13 @@ class FigmaService:
     """Service for interacting with Figma REST API"""
     
     def __init__(self):
-        from app.core.config import get_settings
-        settings = get_settings()
         self.api_token = settings.FIGMA_API_TOKEN
         self.base_url = "https://api.figma.com/v1"
-        
-        if not self.api_token:
+        self.is_configured = bool(self.api_token)
+    
+    def _ensure_configured(self):
+        """Ensure the service is properly configured"""
+        if not self.is_configured:
             raise ValueError("FIGMA_API_TOKEN is not configured")
     
     def _get_headers(self) -> Dict[str, str]:
@@ -122,6 +123,7 @@ class FigmaService:
         Returns:
             FigmaFilesResponse containing files and metadata
         """
+        self._ensure_configured()
         url = f"{self.base_url}/me"
         
         async with httpx.AsyncClient(verify=False) as client:
@@ -208,6 +210,7 @@ class FigmaService:
         Returns:
             FigmaFilesResponse containing files and metadata
         """
+        self._ensure_configured()
         url = f"{self.base_url}/teams/{team_id}/projects"
         
         async with httpx.AsyncClient(verify=False) as client:
@@ -284,6 +287,7 @@ class FigmaService:
         Returns:
             FigmaFilesResponse containing files and metadata
         """
+        self._ensure_configured()
         url = f"{self.base_url}/projects/{project_id}/files"
         
         async with httpx.AsyncClient(verify=False) as client:
