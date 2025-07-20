@@ -667,6 +667,11 @@ Please provide your comprehensive architecture analysis with clear reasoning.
                     analysis_result, user_question, analysis_type
                 )
                 
+                # Format as proper markdown for frontend
+                markdown_analysis = self._format_as_markdown(
+                    enhanced_analysis, user_question, analysis_type
+                )
+                
                 # Count attached files vs screenshots
                 files_attached = len(files_dict) if files_dict else 0
                 screenshots_included = 0
@@ -674,13 +679,15 @@ Please provide your comprehensive architecture analysis with clear reasoning.
                     screenshots_included = len([
                         item for item in visual_data 
                         if item.get("success") and (
-                            item.get("file_path") or item.get("screenshot_base64")
+                            item.get("file_path") or 
+                            item.get("screenshot_base64")
                         )
                     ])
                 
                 return {
                     "success": True,
-                    "analysis": enhanced_analysis,
+                    "analysis": markdown_analysis,
+                    "content_type": "markdown",
                     "cost": cost,
                     "analysis_type": analysis_type,
                     "visual_items_processed": len(visual_data),
@@ -796,6 +803,177 @@ Please provide your comprehensive architecture analysis with clear reasoning.
         
         # Prepend summary to existing analysis
         return summary + analysis
+
+    def _format_as_markdown(
+        self, 
+        content: str, 
+        user_question: str, 
+        analysis_type: str,
+        reasoning_focus: str = None
+    ) -> str:
+        """
+        Format the analysis content as proper markdown for frontend display
+        
+        Args:
+            content: Raw analysis content
+            user_question: Original user question
+            analysis_type: Type of analysis performed
+            reasoning_focus: Focus type for architecture analysis
+            
+        Returns:
+            Properly formatted markdown content
+        """
+        
+        # Clean up and ensure proper markdown formatting
+        markdown_content = content.strip()
+        
+        # Ensure proper spacing around headers
+        import re
+        
+        # Fix header spacing
+        markdown_content = re.sub(r'\n(#{1,6})', r'\n\n\1', markdown_content)
+        markdown_content = re.sub(
+            r'(#{1,6}[^\n]+)\n(?!\n)', 
+            r'\1\n\n', 
+            markdown_content
+        )
+        
+        # Ensure proper list formatting
+        markdown_content = re.sub(
+            r'\n(-|\*|\d+\.)\s', 
+            r'\n\n\1 ', 
+            markdown_content
+        )
+        
+        # Fix multiple consecutive newlines
+        markdown_content = re.sub(r'\n{3,}', '\n\n', markdown_content)
+        
+        # Add metadata section at the top if not present
+        if not markdown_content.startswith('# '):
+            title = self._generate_title(user_question, analysis_type)
+            focus_line = (
+                f"**Reasoning Focus:** {reasoning_focus.title()}\n" 
+                if reasoning_focus else ""
+            )
+            metadata_section = f"""# {title}
+
+**Analysis Type:** {analysis_type.title()}
+{focus_line}**Query:** {user_question}
+**Generated:** {self._get_current_timestamp()}
+
+---
+
+"""
+            markdown_content = metadata_section + markdown_content
+        
+        # Ensure code blocks are properly formatted
+        markdown_content = self._format_code_blocks(markdown_content)
+        
+        # Add table of contents if the content is long
+        if len(markdown_content) > 2000:
+            toc = self._generate_table_of_contents(markdown_content)
+            if toc:
+                # Insert TOC after the first header section
+                parts = markdown_content.split('\n---\n', 1)
+                if len(parts) == 2:
+                    markdown_content = (
+                        parts[0] + '\n---\n\n' + toc + '\n\n' + parts[1]
+                    )
+        
+        # Add footer with helpful information
+        footer = self._generate_markdown_footer(analysis_type)
+        markdown_content += footer
+        
+        return markdown_content.strip()
+    
+    def _generate_title(self, user_question: str, analysis_type: str) -> str:
+        """Generate an appropriate title for the analysis"""
+        
+        if analysis_type == "architecture":
+            return "🏗️ Architecture Analysis"
+        elif analysis_type == "design":
+            return "🎨 Design Analysis"
+        elif analysis_type == "workflow":
+            return "⚡ Workflow Analysis"
+        elif analysis_type == "integration":
+            return "🔗 Integration Analysis"
+        else:
+            return "📊 Visual Content Analysis"
+    
+    def _get_current_timestamp(self) -> str:
+        """Get current timestamp in readable format"""
+        from datetime import datetime
+        return datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
+    
+    def _format_code_blocks(self, content: str) -> str:
+        """Ensure code blocks are properly formatted"""
+        
+        # Fix common code block issues
+        import re
+        
+        # Ensure code blocks have proper newlines
+        content = re.sub(
+            r'```(\w+)?\n?([^`]+)```', 
+            r'\n```\1\n\2\n```\n', 
+            content
+        )
+        
+        # Fix inline code formatting
+        content = re.sub(r'`([^`]+)`', r'`\1`', content)
+        
+        return content
+    
+    def _generate_table_of_contents(self, content: str) -> str:
+        """Generate table of contents from headers"""
+        
+        import re
+        
+        # Extract headers
+        headers = re.findall(r'^(#{2,6})\s+(.+)$', content, re.MULTILINE)
+        
+        if len(headers) < 3:  # Only add TOC for substantial content
+            return ""
+        
+        toc_lines = ["## 📋 Table of Contents\n"]
+        
+        for level_hashes, title in headers:
+            level = len(level_hashes) - 2  # Adjust for h2 being level 0
+            indent = "  " * level
+            
+            # Create anchor link (simplified)
+            anchor = title.lower().replace(' ', '-').replace(':', '')
+            anchor = re.sub(r'[^a-z0-9\-]', '', anchor)
+            
+            toc_lines.append(f"{indent}- [{title}](#{anchor})")
+        
+        return "\n".join(toc_lines)
+    
+    def _generate_markdown_footer(self, analysis_type: str) -> str:
+        """Generate helpful footer information"""
+        
+        footer = f"""
+
+---
+
+## 🔗 Next Steps
+
+Based on this {analysis_type} analysis, consider:
+
+ 1. **Review** the key findings and recommendations above
+ 2. **Implement** high-priority suggestions that align with your goals
+ 3. **Document** any decisions or changes made based on this analysis
+ 4. **Follow up** with specific technical questions if needed
+
+ > 💡 **Tip:** This analysis is most effective when combined with 
+ > hands-on implementation and iterative feedback.
+
+ ---
+
+ *Analysis generated by Enhanced OpenArena Service | 
+ {self._get_current_timestamp()}*
+"""
+        
+        return footer
 
     def determine_analysis_type(self, user_question: str) -> str:
         """
@@ -1060,6 +1238,11 @@ Please provide your comprehensive architecture analysis with clear reasoning.
                 print("🏗️ Architecture Analysis Complete")
                 print("💲 Estimated Cost:", cost)
                 
+                # Format as proper markdown for frontend
+                markdown_analysis = self._format_as_markdown(
+                    analysis_result, user_question, "architecture", reasoning_focus
+                )
+                
                 # Count diagrams processed
                 diagrams_attached = len(files_dict) if files_dict else 0
                 diagrams_total = len([
@@ -1069,7 +1252,8 @@ Please provide your comprehensive architecture analysis with clear reasoning.
                 
                 return {
                     "success": True,
-                    "analysis": analysis_result,
+                    "analysis": markdown_analysis,
+                    "content_type": "markdown",
                     "cost": cost,
                     "reasoning_focus": reasoning_focus,
                     "diagrams_processed": diagrams_total,
