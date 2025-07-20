@@ -75,7 +75,9 @@ class EnhancedQueryService:
             )
             
             # Determine analysis approach
-            analysis_approach = "architecture" if is_architecture_query else "general"
+            analysis_approach = (
+                "architecture" if is_architecture_query else "general"
+            )
             
             results = {
                 "is_visual_query": is_visual_query,
