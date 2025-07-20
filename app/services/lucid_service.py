@@ -6,6 +6,7 @@ import httpx
 from typing import Optional, Dict, List
 from app.core.config import settings
 from app.models.schemas import LucidDocument, LucidDocumentsResponse
+from app.services.cache_service import cache_service
 
 
 class LucidService:
@@ -402,7 +403,8 @@ class LucidService:
         page_id: Optional[str] = None,
         format: str = "png",
         width: Optional[int] = None,
-        height: Optional[int] = None
+        height: Optional[int] = None,
+        use_cache: bool = True
     ) -> Dict[str, any]:
         """
         Export a Lucid document as an image using Get/Export Document endpoint
@@ -413,11 +415,20 @@ class LucidService:
             format: Image format (png, jpg, pdf, svg)
             width: Optional width for the image
             height: Optional height for the image
+            use_cache: Whether to use caching (default: True)
             
         Returns:
             Dictionary containing success status, image data, and metadata
         """
         self._ensure_configured()
+        
+        # Check cache first if enabled
+        if use_cache:
+            cached_result = await cache_service.get_cached_export(
+                document_id, format, page_id, width, height
+            )
+            if cached_result:
+                return cached_result
         
         # Use the Get/Export Document endpoint
         url = f"{self.base_url}/documents/{document_id}"
@@ -480,19 +491,38 @@ class LucidService:
                     # Binary image data
                     image_data = response.content
                     
-                    return {
+                    # Prepare metadata
+                    metadata = {
+                        "document_id": document_id,
+                        "page_id": page_id,
+                        "export_format": format,
+                        "content_type": content_type
+                    }
+                    
+                    # Cache the result if caching is enabled
+                    cache_result = None
+                    if use_cache:
+                        cache_result = await cache_service.cache_export(
+                            document_id, image_data, metadata, 
+                            format, page_id, width, height
+                        )
+                    
+                    result = {
                         "success": True,
                         "image_data": image_data,
                         "content_type": content_type,
                         "format": format,
                         "size": len(image_data),
-                        "metadata": {
-                            "document_id": document_id,
-                            "page_id": page_id,
-                            "export_format": format,
-                            "content_type": content_type
-                        }
+                        "metadata": metadata,
+                        "cached": False
                     }
+                    
+                    # Add cache information if available
+                    if cache_result:
+                        result["cache_info"] = cache_result
+                        result["file_path"] = cache_result.get("file_path")
+                    
+                    return result
                 else:
                     # Unexpected response type
                     error_msg = (f"Unexpected content type: {content_type}. "

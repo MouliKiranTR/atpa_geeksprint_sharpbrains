@@ -243,6 +243,268 @@ QUALITY STANDARDS:
         
         return final_prompt.strip()
     
+    def _create_architecture_diagram_prompt(
+        self,
+        user_question: str,
+        visual_data: List[Dict[str, Any]],
+        reasoning_focus: str = "comprehensive"
+    ) -> str:
+        """
+        Create a specialized prompt for architecture diagram analysis with reasoning
+        
+        Args:
+            user_question: User's question about the architecture
+            visual_data: List of visual content with metadata
+            reasoning_focus: Type of reasoning 
+            (comprehensive, technical, business, security)
+            
+        Returns:
+            Formatted prompt for architecture diagram analysis
+        """
+        
+        # Architecture-specific system context
+        architecture_context = """
+You are an expert Systems Architect and Technical Consultant with deep expertise in:
+- Enterprise architecture patterns and design principles
+- System integration and data flow analysis  
+- Technology stack evaluation and optimization
+- Security architecture and compliance frameworks
+- Scalability, performance, and reliability analysis
+- Cloud architecture and microservices patterns
+- API design and integration strategies
+
+ARCHITECTURE ANALYSIS CAPABILITIES:
+🏗️ STRUCTURAL ANALYSIS:
+- Component identification and relationship mapping
+- Data flow and communication pattern analysis
+- Dependency mapping and coupling assessment
+- Layer separation and architectural pattern recognition
+- Interface and contract definition evaluation
+
+🔍 TECHNICAL REASONING:
+- Design decision rationale and trade-off analysis
+- Technology choice justification and alternatives
+- Performance bottleneck identification
+- Scalability limitation assessment
+- Security vulnerability and risk analysis
+
+💡 STRATEGIC INSIGHTS:
+- Architectural debt and technical risk evaluation
+- Modernization and refactoring recommendations
+- Cost optimization and resource allocation guidance
+- Technology roadmap and evolution planning
+- Best practice alignment and industry standard compliance
+
+📊 DOCUMENTATION & COMMUNICATION:
+- Clear architectural narrative and storytelling
+- Stakeholder-specific explanations (technical/business)
+- Decision documentation with rationale
+- Risk assessment with mitigation strategies
+- Implementation roadmap with priorities
+
+ARCHITECTURE DIAGRAM ANALYSIS FRAMEWORK:
+
+I will be analyzing attached architecture diagrams that you provide. These diagrams may include:
+- System architecture diagrams
+- Component relationship diagrams  
+- Data flow diagrams
+- Network topology diagrams
+- Service interaction diagrams
+- Database schema diagrams
+- Deployment architecture diagrams
+- Security architecture diagrams
+
+REASONING APPROACH:
+1. 🔎 VISUAL INSPECTION: Systematically examine all components, 
+   connections, and annotations
+2. 🧩 PATTERN RECOGNITION: Identify architectural patterns, 
+   anti-patterns, and design principles
+3. 🔬 TECHNICAL ANALYSIS: Evaluate technical decisions, constraints, 
+   and implementation details
+4. ⚖️ TRADE-OFF ASSESSMENT: Analyze design choices, alternatives, 
+   and their implications
+5. 🎯 GAP IDENTIFICATION: Spot missing components, unclear relationships, 
+   or potential issues
+6. 💭 REASONING SYNTHESIS: Provide logical reasoning chains for 
+   observations and recommendations
+
+ANALYSIS OUTPUT STRUCTURE:
+📋 EXECUTIVE SUMMARY
+- High-level architecture overview
+- Key findings and critical insights
+- Primary recommendations
+
+🏗️ ARCHITECTURAL OVERVIEW  
+- System purpose and scope
+- Major components and their roles
+- Overall architectural style/pattern
+
+🔗 COMPONENT ANALYSIS
+- Individual component breakdown
+- Inter-component relationships
+- Data and control flows
+
+⚡ TECHNICAL ASSESSMENT
+- Technology stack evaluation
+- Performance and scalability considerations
+- Security and compliance aspects
+
+🚨 RISKS & RECOMMENDATIONS
+- Identified risks and concerns
+- Improvement suggestions
+- Next steps and action items
+
+REASONING QUALITY STANDARDS:
+✅ Evidence-based conclusions from visual analysis
+✅ Clear logical reasoning chains
+✅ Multiple perspective consideration
+✅ Practical, actionable recommendations
+✅ Risk-aware assessment with mitigation strategies
+✅ Context-appropriate level of technical detail
+        """
+        
+        # Create visual content summary
+        diagram_context = "\n\nARCHITECTURE DIAGRAMS TO ANALYZE:\n"
+        diagram_context += "="*60 + "\n\n"
+        
+        for i, item in enumerate(visual_data, 1):
+            if not item.get("success"):
+                error_msg = item.get('error', 'Unknown error')
+                diagram_context += (
+                    f"Diagram {i}: ❌ Failed to capture - {error_msg}\n\n"
+                )
+                continue
+                
+            source = item.get("source", "unknown").upper()
+            diagram_context += f"📐 DIAGRAM {i} ({source}):\n"
+            
+            if source == "FIGMA":
+                file_name = item.get('file_name', 'Unknown')
+                diagram_context += f"   📄 File: {file_name}\n"
+                diagram_context += f"   🔑 Key: {item.get('file_key', 'N/A')}\n"
+                
+                metadata = item.get("metadata", {})
+                if metadata:
+                    doc_name = metadata.get('document_name', 'N/A')
+                    diagram_context += f"   📋 Document: {doc_name}\n"
+                    last_mod = metadata.get('last_modified', 'N/A')
+                    diagram_context += f"   📅 Last Modified: {last_mod}\n"
+                    version = metadata.get('version', 'N/A')
+                    diagram_context += f"   🔢 Version: {version}\n"
+                    pages = metadata.get('pages', 'N/A')
+                    diagram_context += f"   📑 Pages: {pages}\n"
+                    description = metadata.get('description', 'N/A')
+                    diagram_context += f"   📝 Description: {description}\n"
+                    
+            elif source == "LUCID":
+                diagram_title = item.get('diagram_title', 'Unknown')
+                diagram_context += f"   📊 Title: {diagram_title}\n"
+                diagram_context += f"   🆔 ID: {item.get('diagram_id', 'N/A')}\n"
+                
+                metadata = item.get("metadata", {})
+                if metadata:
+                    export_id = metadata.get('export_id', 'N/A')
+                    diagram_context += f"   📤 Export ID: {export_id}\n"
+                    format_type = metadata.get('format', 'N/A')
+                    diagram_context += f"   🎨 Format: {format_type}\n"
+                    scale = metadata.get('scale', 'N/A')
+                    diagram_context += f"   📏 Scale: {scale}\n"
+                    
+            capture_method = item.get('capture_method', 'Unknown')
+            diagram_context += f"   🔧 Capture Method: {capture_method}\n"
+            
+            has_attachment = (
+                item.get('file_path') or item.get('screenshot_base64')
+            )
+            attachment_status = "✅ Available" if has_attachment else "❌ Missing"
+            diagram_context += f"   📎 Visual Data: {attachment_status}\n\n"
+        
+        # Reasoning focus instructions
+        focus_instructions = {
+            "comprehensive": """
+🎯 COMPREHENSIVE REASONING FOCUS:
+Provide thorough analysis covering all architectural aspects:
+- Complete component inventory and relationship mapping
+- End-to-end data flow and process analysis  
+- Technology stack evaluation and modernization opportunities
+- Security, performance, and scalability assessment
+- Business alignment and strategic value analysis
+- Implementation complexity and risk evaluation
+            """,
+            
+            "technical": """
+🔧 TECHNICAL REASONING FOCUS:
+Deep dive into technical implementation details:
+- Technology choices and their rationale
+- Integration patterns and API design
+- Data persistence and storage strategies
+- Performance optimization opportunities
+- Technical debt and refactoring needs
+- Development and deployment considerations
+            """,
+            
+            "business": """
+💼 BUSINESS REASONING FOCUS:
+Analyze from business value and operational perspective:
+- Business capability mapping and gaps
+- Process efficiency and automation opportunities
+- Cost implications and ROI considerations
+- Risk management and compliance requirements
+- Stakeholder impact and change management
+- Strategic alignment with business objectives
+            """,
+            
+            "security": """
+🔒 SECURITY REASONING FOCUS:
+Comprehensive security architecture analysis:
+- Security control identification and gaps
+- Data protection and privacy compliance
+- Access control and authentication mechanisms
+- Network security and segmentation
+- Threat modeling and vulnerability assessment
+- Security monitoring and incident response capabilities
+            """
+        }
+        
+        reasoning_instruction = focus_instructions.get(
+            reasoning_focus, focus_instructions["comprehensive"]
+        )
+        
+        # Construct the complete prompt
+        final_prompt = f"""
+{architecture_context}
+
+{reasoning_instruction}
+
+{diagram_context}
+
+USER QUESTION:
+{user_question}
+
+ANALYSIS INSTRUCTIONS:
+🎯 WHAT TO DO:
+1. Carefully examine ALL attached architecture diagrams
+2. Apply systematic reasoning to understand the architectural design
+3. Identify patterns, relationships, and design decisions
+4. Assess technical and business implications
+5. Provide evidence-based insights with clear reasoning chains
+
+📝 HOW TO RESPOND:
+- Start with a clear executive summary (2-3 sentences)
+- Use the structured format: Overview → Analysis → Assessment → Recommendations
+- Include specific references to diagram elements you observe
+
+⚠️ IMPORTANT NOTES:
+- If diagrams are not clearly visible, focus analysis on metadata and context
+- Ask clarifying questions if critical information appears to be missing
+- Prioritize actionable insights over theoretical observations
+- Consider both immediate and long-term architectural implications
+
+Please provide your comprehensive architecture analysis with clear reasoning.
+        """
+        
+        return final_prompt.strip()
+    
     async def analyze_visual_content(
         self,
         user_question: str,
@@ -347,7 +609,7 @@ QUALITY STANDARDS:
                     self.base_url,
                     headers=headers,
                     json=json_payload,
-                    timeout=120
+                    timeout=300  # Extended timeout for visual analysis
                 )
                 
             else:
@@ -380,7 +642,7 @@ QUALITY STANDARDS:
                     self.base_url,
                     headers=headers,
                     json=json_payload,
-                    timeout=120
+                    timeout=300  # Extended timeout for visual analysis
                 )
             
             status_code = response.status_code
@@ -673,6 +935,166 @@ QUALITY STANDARDS:
                     print(f"🗑️ Cleaned up temp file: {file_path}")
             except Exception as e:
                 print(f"⚠️ Failed to clean up {file_path}: {e}")
+
+    async def analyze_architecture_diagrams(
+        self,
+        user_question: str,
+        visual_data: List[Dict[str, Any]],
+        reasoning_focus: str = "comprehensive",
+        include_screenshots: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Analyze architecture diagrams with specialized reasoning focus
+        
+        Args:
+            user_question: User's question about the architecture
+            visual_data: List of captured architecture diagrams
+            reasoning_focus: Focus type (comprehensive, technical, business, security)
+            include_screenshots: Whether to include visual attachments
+            
+        Returns:
+            Architecture analysis result from OpenArena
+        """
+        temp_files_to_cleanup = []
+        
+        try:
+            # Get authentication token
+            openarena_token = self.auth.authenticate_and_get_token()
+            
+            if not openarena_token:
+                return {
+                    "success": False,
+                    "error": "Failed to authenticate with OpenArena"
+                }
+            
+            # Create architecture-specific analysis prompt
+            architecture_prompt = self._create_architecture_diagram_prompt(
+                user_question, visual_data, reasoning_focus
+            )
+            
+            # Prepare headers
+            headers = {
+                'Authorization': f'Bearer {openarena_token}',
+                'Content-Type': 'application/json'
+            }
+            
+            # Prepare files for attachment if available
+            files_dict = {}
+            if include_screenshots and visual_data:
+                files_dict = self._prepare_attachment_files(
+                    visual_data, temp_files_to_cleanup
+                )
+            
+            # Enhanced prompt with visual content if available
+            if files_dict:
+                print(f"📐 Processing {len(files_dict)} architecture diagrams")
+                
+                # Convert files to base64 and embed in prompt
+                enhanced_prompt = architecture_prompt + "\n\nVISUAL CONTENT:\n"
+                
+                for file_key, (filename, file_handle, content_type) in files_dict.items():
+                    try:
+                        file_handle.seek(0)
+                        file_content = file_handle.read()
+                        import base64
+                        encoded_content = base64.b64encode(file_content).decode('utf-8')
+                        
+                        enhanced_prompt += f"\n{filename}: Architecture Diagram\n"
+                        enhanced_prompt += f"Base64: {encoded_content[:100]}...\n"
+                        
+                        file_handle.close()
+                        
+                    except Exception as e:
+                        print(f"Error processing {filename}: {e}")
+                
+                final_prompt = enhanced_prompt
+            else:
+                final_prompt = architecture_prompt
+            
+            # Create request payload
+            json_payload = {
+                "workflow_id": self.workflow_id,
+                "query": final_prompt,
+                "is_persistence_allowed": True,
+                "modelparams": {
+                    "anthropic_direct.claude-v4-sonnet": {
+                        "temperature": "0.2",  # Lower temp for more focused analysis
+                        "top_p": "0.9",
+                        "max_tokens": "63999",
+                        "top_k": "250",
+                        "system_prompt": (
+                            "You are an expert Systems Architect with deep "
+                            "technical reasoning capabilities. Analyze the "
+                            "provided architecture diagrams systematically "
+                            "and provide evidence-based insights with clear "
+                            "logical reasoning chains. Focus on actionable "
+                            "recommendations and architectural best practices."
+                        ),
+                        "enable_reasoning": "true",
+                        "budget_tokens": "35425"
+                    }
+                }
+            }
+            
+            # Make request to OpenArena with extended timeout for architecture analysis
+            response = requests.post(
+                self.base_url,
+                headers=headers,
+                json=json_payload,
+                timeout=300  # Extended to 5 minutes for complex architecture analysis
+            )
+            
+            print(f"Architecture Analysis Response Status: {response.status_code}")
+            
+            if response.status_code == 200:
+                ai_response = response.json()
+                
+                analysis_result = ai_response.get('result', {}).get(
+                    'answer', {}
+                ).get('anthropic_direct.claude-v4-sonnet', '')
+                
+                cost = ai_response.get('result', {}).get(
+                    'cost_track', {}
+                ).get('total_cost', None)
+                
+                print("🏗️ Architecture Analysis Complete")
+                print("💲 Estimated Cost:", cost)
+                
+                # Count diagrams processed
+                diagrams_attached = len(files_dict) if files_dict else 0
+                diagrams_total = len([
+                    item for item in visual_data 
+                    if item.get("success")
+                ])
+                
+                return {
+                    "success": True,
+                    "analysis": analysis_result,
+                    "cost": cost,
+                    "reasoning_focus": reasoning_focus,
+                    "diagrams_processed": diagrams_total,
+                    "diagrams_attached": diagrams_attached,
+                    "analysis_type": "architecture"
+                }
+            else:
+                error_text = response.text
+                error_msg = f"OpenArena Error: {response.status_code}, {error_text}"
+                print(f"⚠️ {error_msg}")
+                return {
+                    "success": False,
+                    "error": error_msg
+                }
+                
+        except Exception as e:
+            print(f"🚨 Architecture analysis failed: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+        finally:
+            # Clean up temporary files
+            if temp_files_to_cleanup:
+                self._cleanup_temp_files(temp_files_to_cleanup)
 
 
 # Create service instance

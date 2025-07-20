@@ -54,6 +54,12 @@ class Settings(BaseSettings):
     # Figma API Configuration
     FIGMA_API_TOKEN: Optional[str] = None
     
+    # Cache Configuration
+    CACHE_ENABLED: bool = True
+    CACHE_DIR: str = "./cache"
+    CACHE_EXPIRY_HOURS: int = 24
+    AUTO_UPLOAD_TO_OPENARENA: bool = True
+    
     @field_validator('ALLOWED_FILE_TYPES')
     @classmethod
     def parse_allowed_file_types(cls, v):

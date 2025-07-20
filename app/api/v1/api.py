@@ -5,7 +5,7 @@ Main API router for v1 endpoints
 from fastapi import APIRouter
 from app.api.v1.endpoints import (
     query, upload, health, program_generation, 
-    lucid_mcp, figma_mcp, enhanced_query
+    lucid_mcp, figma_mcp, enhanced_query, cache_management
 )
 
 api_router = APIRouter()
@@ -45,4 +45,9 @@ api_router.include_router(
     enhanced_query.router,
     prefix="/enhanced-query",
     tags=["enhanced-query"]
+)
+api_router.include_router(
+    cache_management.router,
+    prefix="/cache",
+    tags=["cache-management"]
 ) 

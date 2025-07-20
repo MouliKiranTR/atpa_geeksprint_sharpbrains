@@ -9,10 +9,6 @@ from typing import List, Dict, Any, Optional
 from docx import Document
 import PyPDF2
 import pandas as pd
-from bs4 import BeautifulSoup
-import requests
-import aiofiles
-import os
 
 from app.core.config import settings
 from app.models.schemas import DataSourceType
