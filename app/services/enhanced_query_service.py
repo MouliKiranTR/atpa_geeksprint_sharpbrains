@@ -28,7 +28,8 @@ class EnhancedQueryService:
         max_visual_items: int = 3
     ) -> Dict[str, Any]:
         """
-        Analyze user query and provide comprehensive response
+        Analyze user query and provide comprehensive response with parallel 
+        source searching
         
         Args:
             user_question: User's question
@@ -98,195 +99,199 @@ class EnhancedQueryService:
                 "combined_response": ""
             }
             
-            # Search for relevant content
+            # 🚀 PARALLEL SOURCE SEARCH - Search all enabled sources
+            # Create search tasks for all enabled sources (parallel execution)
             search_tasks = []
+            task_labels = []
             
-            if include_figma and is_visual_query:
+            if include_figma:
                 search_tasks.append(self._search_figma_content(user_question))
+                task_labels.append("figma")
             
-            if include_lucid and is_visual_query:
+            if include_lucid:
                 search_tasks.append(self._search_lucid_content(user_question))
+                task_labels.append("lucid")
             
             if include_documents:
-                search_tasks.append(self._search_document_content(user_question))
+                search_tasks.append(
+                    self._search_document_content(user_question)
+                )
+                task_labels.append("documents")
             
-            # Execute searches concurrently
+            # Execute all searches in parallel
             if search_tasks:
-                search_results_list = await asyncio.gather(*search_tasks)
+                search_results_list = await asyncio.gather(
+                    *search_tasks, return_exceptions=True
+                )
                 
-                # Process search results
-                for result in search_results_list:
-                    if result:
+                # Process search results and handle any exceptions
+                for i, (result, label) in enumerate(
+                    zip(search_results_list, task_labels)
+                ):
+                    if isinstance(result, Exception):
+                        # Add empty result for failed searches
+                        error_key = f"{label}_error"
+                        results["search_results"][error_key] = str(result)
+                    elif result:
                         results["search_results"].update(result)
             
-            # Process visual content if found
+            # 📊 CONSOLIDATE SEARCH RESULTS for OpenArena
+            
+            # Collect visual items from search results
             visual_items = []
+            
+            # Add Figma files to visual items
             if results["search_results"].get("figma_files"):
-                for file in results["search_results"]["figma_files"][:max_visual_items]:
+                figma_list = results["search_results"]["figma_files"]
+                figma_files = figma_list[:max_visual_items]
+                for file in figma_files:
                     visual_items.append({
                         "type": "figma",
                         "id": file.key,
-                        "name": file.name
+                        "name": file.name,
+                        "source_info": {
+                            "last_modified": getattr(
+                                file, 'last_modified', 'Unknown'
+                            ),
+                            "thumbnail_url": getattr(
+                                file, 'thumbnail_url', ''
+                            ),
+                            "file_type": getattr(
+                                file, 'file_type', 'design'
+                            )
+                        }
                     })
             
+            # Add Lucid diagrams to visual items
             if results["search_results"].get("lucid_diagrams"):
                 remaining_slots = max_visual_items - len(visual_items)
-                for diagram in results["search_results"]["lucid_diagrams"][:remaining_slots]:
+                lucid_diagrams = results["search_results"][
+                    "lucid_diagrams"
+                ][:remaining_slots]
+                for diagram in lucid_diagrams:
                     visual_items.append({
                         "type": "lucid", 
                         "id": diagram.id,
-                        "name": diagram.title
+                        "name": diagram.title,
+                        "source_info": {
+                            "product": getattr(diagram, 'product', 'Unknown'),
+                            "last_modified": getattr(
+                                diagram, 'lastModified', 'Unknown'
+                            ),
+                            "folder_id": getattr(diagram, 'folderId', None)
+                        }
                     })
             
-            # Capture and analyze visual content
-            if visual_items and is_visual_query:
-                print(f"📷 Capturing and exporting {len(visual_items)} items to files...")
+            # 🎯 OPENARENA ANALYSIS - Pass consolidated results to OpenArena
+            if visual_items or results["search_results"]:
                 
-                # Use consolidated visual capture service for file exports
-                visual_data = await visual_capture_service.capture_multiple_screenshots(
-                    visual_items, export_to_files=True
-                )
-                
-                # Track files for cleanup
-                for item in visual_data:
-                    if item.get("success") and item.get("file_path"):
-                        temp_files_to_cleanup.append(item["file_path"])
-                
-                # Choose analysis method based on query type
-                if is_architecture_query:
-                    print("🏗️ Using specialized architecture analysis...")
+                # Capture visual content if visual items found
+                visual_data = []
+                if visual_items:
                     
-                    # Determine reasoning focus for architecture analysis
-                    reasoning_focus = self._determine_architecture_reasoning_focus(
-                        user_question
+                    # Use consolidated visual capture service for file exports
+                    visual_data = await (
+                        visual_capture_service.capture_multiple_screenshots(
+                            visual_items, export_to_files=True
+                        )
                     )
                     
-                    visual_analysis = await enhanced_openarena_service.analyze_architecture_diagrams(
-                        user_question=user_question,
-                        visual_data=visual_data,
-                        reasoning_focus=reasoning_focus,
-                        include_screenshots=True
+                    # Track files for cleanup
+                    for item in visual_data:
+                        if item.get("success") and item.get("file_path"):
+                            temp_files_to_cleanup.append(item["file_path"])
+                
+                # Add document context to visual data if available
+                if results["search_results"].get("documents"):
+                    document_context = self._prepare_document_context(
+                        results["search_results"]["documents"]
+                    )
+                    visual_data.append({
+                        "success": True,
+                        "source": "documents",
+                        "metadata": document_context,
+                        "capture_method": "context_extraction"
+                    })
+                
+                # Add search metadata to visual data
+                search_metadata = {
+                    "sources_searched": task_labels,
+                    "total_figma_files": len(
+                        results["search_results"].get("figma_files", [])
+                    ),
+                    "total_lucid_diagrams": len(
+                        results["search_results"].get("lucid_diagrams", [])
+                    ),
+                    "total_documents": len(
+                        results["search_results"].get("documents", [])
+                    ),
+                    "query_type": results["query_analysis"]["analysis_type"]
+                }
+                
+                visual_data.append({
+                    "success": True,
+                    "source": "query_analysis",
+                    "metadata": search_metadata,
+                    "capture_method": "search_aggregation"
+                })
+                
+                # 🏗️ Choose appropriate OpenArena analysis method
+                if is_architecture_query:
+                    
+                    # Use unified analysis method for architecture analysis
+                    visual_analysis = await (
+                        enhanced_openarena_service.analyze_content(
+                            user_question=user_question,
+                            visual_data=visual_data,
+                            analysis_type="architecture"
+                        )
                     )
                 else:
-                    print("🔍 Using general visual analysis...")
-                    # Use general visual analysis
-                    visual_analysis = await enhanced_openarena_service.analyze_visual_content(
-                        user_question=user_question,
-                        visual_data=visual_data,
-                        analysis_type=results["query_analysis"]["analysis_type"],
-                        include_screenshots=True
+                    
+                    visual_analysis = await (
+                        enhanced_openarena_service.analyze_visual_content(
+                            user_question=user_question,
+                            visual_data=visual_data,
+                            analysis_type=results["query_analysis"][
+                                "analysis_type"
+                            ],
+                            include_screenshots=bool(visual_items)
+                        )
                     )
-                    print(f"🔍 DEBUG: Visual analysis result: {visual_analysis.get('success', 'No success key')}")
-                    if not visual_analysis.get('success'):
-                        print(f"🔍 DEBUG: Visual analysis error: {visual_analysis.get('error', 'No error info')}")
                 
+                # Store analysis results
                 results["visual_analysis"] = visual_analysis
                 
-                # Format combined response with visual analysis
-                results["combined_response"] = await self._format_response_with_visual_analysis(
-                    user_question=user_question,
-                    search_results=results["search_results"],
-                    visual_analysis=visual_analysis,
-                    analysis_approach=analysis_approach
+                # Format comprehensive response
+                results["combined_response"] = await (
+                    self._format_comprehensive_response(
+                        user_question=user_question,
+                        search_results=results["search_results"],
+                        visual_analysis=visual_analysis,
+                        analysis_approach=analysis_approach,
+                        sources_searched=task_labels
+                    )
                 )
                 
             else:
-                print("📝 No visual content found, or non-visual query...")
                 
-                # Create mock visual data with metadata for analysis
-                mock_visual_data = []
-                if results["search_results"].get("figma_files"):
-                    for file in results["search_results"]["figma_files"][:max_visual_items]:
-                        mock_visual_data.append({
-                            "success": True,
-                            "file_key": file.key,
-                            "file_name": file.name,
-                            "metadata": {
-                                "name": file.name,
-                                "last_modified": getattr(file, 'last_modified', 'Unknown'),
-                                "thumbnail_url": getattr(file, 'thumbnail_url', ''),
-                                "description": "Figma design file - no screenshot captured"
-                            },
-                            "source": "figma",
-                            "capture_method": "metadata_only"
-                        })
-                
-                if results["search_results"].get("lucid_diagrams"):
-                    remaining_slots = max_visual_items - len(mock_visual_data)
-                    for diagram in results["search_results"]["lucid_diagrams"][:remaining_slots]:
-                        mock_visual_data.append({
-                            "success": True,
-                            "diagram_id": diagram.id,
-                            "diagram_title": diagram.title,
-                            "metadata": {
-                                "title": diagram.title,
-                                "product": getattr(diagram, 'product', 'Unknown'),
-                                "url": getattr(diagram, 'url', ''),
-                                "description": "Lucid diagram - no screenshot captured"
-                            },
-                            "source": "lucid",
-                            "capture_method": "metadata_only"
-                        })
-                
-                # Choose analysis method for metadata-only analysis
-                if is_architecture_query:
-                    print("🏗️ Using architecture analysis for metadata...")
-                    
-                    reasoning_focus = self._determine_architecture_reasoning_focus(
-                        user_question
-                    )
-                    
-                    visual_analysis = await enhanced_openarena_service.analyze_architecture_diagrams(
+                # Create fallback response when no sources return results
+                results["combined_response"] = await (
+                    self._format_no_results_response(
                         user_question=user_question,
-                        visual_data=mock_visual_data,
-                        reasoning_focus=reasoning_focus,
-                        include_screenshots=False
+                        sources_searched=task_labels,
+                        errors=results["search_results"]
                     )
-                    print(f"🔍 DEBUG: Metadata architecture analysis result: {visual_analysis.get('success', 'No success key')}")
-                    if not visual_analysis.get('success'):
-                        print(f"🔍 DEBUG: Metadata architecture analysis error: {visual_analysis.get('error', 'No error info')}")
-                else:
-                    print("🔍 Using general visual analysis for metadata...")
-                    # Use general visual analysis for metadata
-                    visual_analysis = await enhanced_openarena_service.analyze_visual_content(
-                        user_question=user_question,
-                        visual_data=mock_visual_data,
-                        analysis_type=results["query_analysis"]["analysis_type"],
-                        include_screenshots=False
-                    )
-                    print(f"🔍 DEBUG: Metadata visual analysis result: {visual_analysis.get('success', 'No success key')}")
-                    if not visual_analysis.get('success'):
-                        print(f"🔍 DEBUG: Metadata visual analysis error: {visual_analysis.get('error', 'No error info')}")
-                
-                results["visual_analysis"] = visual_analysis
-                
-                # Format response with metadata analysis
-                results["combined_response"] = await self._format_response_with_metadata_analysis(
-                    user_question=user_question,
-                    search_results=results["search_results"],
-                    visual_analysis=visual_analysis,
-                    analysis_approach=analysis_approach
                 )
-            
-            # Process document content if available (but visual content not found)
-            if results["search_results"].get("documents") and not results.get("visual_analysis"):
-                results["document_analysis"] = await self._analyze_document_content(
-                    user_question, results["search_results"]["documents"]
-                )
-                
-                # Create response based on document analysis
-                if not results["combined_response"]:
-                    results["combined_response"] = await self._format_document_response(
-                        user_question, results["document_analysis"]
-                    )
             
             # Set processing time
-            results["query_analysis"]["processing_time"] = time.time() - start_time
+            results["query_analysis"]["processing_time"] = (
+                time.time() - start_time
+            )
             
             return results
             
         except Exception as e:
-            print(f"🚨 Enhanced query analysis error: {e}")
             return {
                 "error": str(e),
                 "is_visual_query": False,
@@ -302,7 +307,9 @@ class EnhancedQueryService:
         finally:
             # Clean up temporary files
             if temp_files_to_cleanup:
-                visual_capture_service.cleanup_temp_files(temp_files_to_cleanup)
+                visual_capture_service.cleanup_temp_files(
+                    temp_files_to_cleanup
+                )
 
     async def _search_figma_content(self, query: str) -> Dict[str, Any]:
         """Search Figma files based on query"""
@@ -320,8 +327,7 @@ class EnhancedQueryService:
                     "search_query": query
                 }
             }
-        except Exception as e:
-            print(f"Error searching Figma: {e}")
+        except Exception:
             return {}
     
     async def _search_lucid_content(self, query: str) -> Dict[str, Any]:
@@ -341,8 +347,7 @@ class EnhancedQueryService:
                     "search_query": query
                 }
             }
-        except Exception as e:
-            print(f"Error searching Lucid: {e}")
+        except Exception:
             return {}
     
     async def _search_document_content(self, query: str) -> Dict[str, Any]:
@@ -353,101 +358,12 @@ class EnhancedQueryService:
             return {
                 "documents": documents
             }
-        except Exception as e:
-            print(f"Error searching documents: {e}")
+        except Exception:
             return {}
-    
-    async def _format_response_with_visual_analysis(
-        self, 
-        user_question: str, 
-        search_results: Dict[str, Any], 
-        visual_analysis: Dict[str, Any], 
-        analysis_approach: str
+
+    def _determine_architecture_reasoning_focus(
+        self, user_question: str
     ) -> str:
-        """Formats a response using the visual analysis result."""
-        response_parts = []
-        
-        # Add visual analysis result
-        if visual_analysis and visual_analysis.get("success"):
-            analysis = visual_analysis["analysis"]
-            print(f"✅ DEBUG: Using visual analysis result (length: {len(analysis)})")
-            response_parts.append(analysis)
-        else:
-            print(f"❌ DEBUG: Visual analysis failed or not available.")
-            if visual_analysis and visual_analysis.get("error"):
-                response_parts.append(f"## ⚠️ Visual Analysis Error\n\n{visual_analysis['error']}")
-            else:
-                response_parts.append("## 📝 No visual analysis result available.")
-        
-        # Add search results summary
-        response_parts.append(f"## 🔍 Search Results for \"{user_question}\"")
-        response_parts.append(f"- Figma files: {'✅' if search_results.get('figma_files') else '❌'}")
-        response_parts.append(f"- Lucid diagrams: {'✅' if search_results.get('lucid_diagrams') else '❌'}")
-        response_parts.append(f"- Documents: {'✅' if search_results.get('documents') else '❌'}")
-        
-        return "\n\n".join(response_parts)
-
-    async def _format_response_with_metadata_analysis(
-        self, 
-        user_question: str, 
-        search_results: Dict[str, Any], 
-        visual_analysis: Dict[str, Any], 
-        analysis_approach: str
-    ) -> str:
-        """Formats a response using the visual analysis result."""
-        response_parts = []
-        
-        # Add visual analysis result
-        if visual_analysis and visual_analysis.get("success"):
-            analysis = visual_analysis["analysis"]
-            print(f"✅ DEBUG: Using visual analysis result (length: {len(analysis)})")
-            response_parts.append(analysis)
-        else:
-            print(f"❌ DEBUG: Visual analysis failed or not available.")
-            if visual_analysis and visual_analysis.get("error"):
-                response_parts.append(f"## ⚠️ Visual Analysis Error\n\n{visual_analysis['error']}")
-            else:
-                response_parts.append("## 📝 No visual analysis result available.")
-        
-        # Add search results summary
-        response_parts.append(f"## 🔍 Search Results for \"{user_question}\"")
-        response_parts.append(f"- Figma files: {'✅' if search_results.get('figma_files') else '❌'}")
-        response_parts.append(f"- Lucid diagrams: {'✅' if search_results.get('lucid_diagrams') else '❌'}")
-        response_parts.append(f"- Documents: {'✅' if search_results.get('documents') else '❌'}")
-        
-        return "\n\n".join(response_parts)
-
-    async def _format_document_response(
-        self, 
-        user_question: str, 
-        document_analysis: Dict[str, Any]
-    ) -> str:
-        """Formats a response based on document analysis."""
-        response_parts = []
-        
-        response_parts.append(f"## 📄 Document Analysis")
-        response_parts.append(f"Found {document_analysis['relevant_documents']} relevant documents.")
-        response_parts.append(f"**Context Preview:**\n{document_analysis['context_preview']}")
-        
-        return "\n\n".join(response_parts)
-
-    async def _analyze_document_content(
-        self, 
-        user_question: str, 
-        documents: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
-        """Analyzes uploaded documents based on query."""
-        doc_context = data_source_service.get_document_context(
-            documents,
-            max_length=3000
-        )
-        
-        return {
-            "relevant_documents": len(documents),
-            "context_preview": doc_context[:500] + "..." if len(doc_context) > 500 else doc_context
-        }
-
-    def _determine_architecture_reasoning_focus(self, user_question: str) -> str:
         """
         Determine the appropriate reasoning focus for architecture analysis
         
@@ -488,6 +404,172 @@ class EnhancedQueryService:
             return "technical"
         else:
             return "comprehensive"
+
+    def _prepare_document_context(
+        self, 
+        documents: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """
+        Prepare document context for OpenArena analysis
+        
+        Args:
+            documents: List of document search results
+            
+        Returns:
+            Document context metadata
+        """
+        if not documents:
+            return {"context_preview": "No documents found", "count": 0}
+        
+        # Get document context from data source service
+        doc_context = data_source_service.get_document_context(
+            documents,
+            max_length=3000
+        )
+        
+        return {
+            "context_preview": (
+                doc_context[:500] + "..." 
+                if len(doc_context) > 500 
+                else doc_context
+            ),
+            "full_context": doc_context,
+            "document_count": len(documents),
+            "total_length": len(doc_context)
+        }
+
+    async def _format_comprehensive_response(
+        self, 
+        user_question: str, 
+        search_results: Dict[str, Any], 
+        visual_analysis: Dict[str, Any], 
+        analysis_approach: str,
+        sources_searched: List[str]
+    ) -> str:
+        """
+        Format a comprehensive response using OpenArena analysis and 
+        search results
+        
+        Args:
+            user_question: Original user question
+            search_results: All search results from different sources
+            visual_analysis: OpenArena analysis results
+            analysis_approach: Type of analysis performed
+            sources_searched: List of sources that were searched
+            
+        Returns:
+            Formatted comprehensive response
+        """
+        response_parts = []
+        
+        # Add visual analysis result from OpenArena
+        if visual_analysis and visual_analysis.get("success"):
+            analysis = visual_analysis["analysis"]
+            response_parts.append(analysis)
+            
+            # Add metadata about the analysis
+            cost = visual_analysis.get("cost")
+            if cost:
+                response_parts.append(f"\n💲 **Analysis Cost:** ${cost}")
+        else:
+            if visual_analysis and visual_analysis.get("error"):
+                response_parts.append(
+                    f"## ⚠️ Analysis Error\n\n{visual_analysis['error']}"
+                )
+            else:
+                response_parts.append("## 📝 No analysis result available.")
+        
+        # Add search results summary
+        response_parts.append("\n## 🔍 Search Summary")
+        response_parts.append(f"**Query:** \"{user_question}\"")
+        response_parts.append(
+            f"**Analysis Approach:** {analysis_approach.title()}"
+        )
+        response_parts.append(
+            f"**Sources Searched:** {', '.join(sources_searched)}"
+        )
+        
+        # Add detailed search results
+        search_summary = []
+        if search_results.get("figma_files"):
+            count = len(search_results["figma_files"])
+            search_summary.append(f"- **Figma Files:** {count} found")
+        
+        if search_results.get("lucid_diagrams"):
+            count = len(search_results["lucid_diagrams"])
+            search_summary.append(f"- **Lucid Diagrams:** {count} found")
+        
+        if search_results.get("documents"):
+            count = len(search_results["documents"])
+            search_summary.append(f"- **Documents:** {count} found")
+        
+        # Add error information if any searches failed
+        error_sources = [
+            key for key in search_results.keys() 
+            if key.endswith("_error")
+        ]
+        if error_sources:
+            search_summary.append(
+                f"- **Errors:** {len(error_sources)} source(s) failed"
+            )
+        
+        if search_summary:
+            response_parts.append("\n".join(search_summary))
+        else:
+            response_parts.append("- No results found in any source")
+        
+        return "\n\n".join(response_parts)
+
+    async def _format_no_results_response(
+        self, 
+        user_question: str, 
+        sources_searched: List[str],
+        errors: Dict[str, Any]
+    ) -> str:
+        """
+        Format a response when no results are found from any source
+        
+        Args:
+            user_question: Original user question
+            sources_searched: List of sources that were searched
+            errors: Any errors that occurred during searching
+            
+        Returns:
+            Formatted no-results response
+        """
+        response_parts = []
+        
+        response_parts.append("## 📭 No Results Found")
+        response_parts.append(f"**Query:** \"{user_question}\"")
+        response_parts.append(
+            f"**Sources Searched:** {', '.join(sources_searched)}"
+        )
+        
+        # Check for errors
+        error_sources = [
+            key for key in errors.keys() if key.endswith("_error")
+        ]
+        if error_sources:
+            response_parts.append("\n## ⚠️ Search Errors")
+            for error_key in error_sources:
+                source = error_key.replace("_error", "").title()
+                error_msg = errors[error_key]
+                response_parts.append(f"- **{source}:** {error_msg}")
+        
+        # Provide suggestions
+        response_parts.append("\n## 💡 Suggestions")
+        suggestions = [
+            "Try using different keywords in your search",
+            "Check if the relevant files/diagrams exist in your connected "
+            "sources",
+            "Verify your API connections are working properly",
+            "Consider uploading relevant documents if available"
+        ]
+        
+        for suggestion in suggestions:
+            response_parts.append(f"- {suggestion}")
+        
+        return "\n\n".join(response_parts)
 
 
 # Create service instance
