@@ -1,0 +1,4 @@
+
+# Resources:
+- Customer Search API Setup Process - https://trten.sharepoint.com/:w:/r/sites/TRTAKSCheckpointAnswers/_layouts/15/Doc.aspx?sourcedoc=%7B10B2E2C0-891D-4A65-B1B7-C499FDDB3F53%7D&file=Customer%20Search%20API%20Setup%20Process.docx&wdLOR=cD25D4E85-C464-4E24-AAA8-0ACA5ACA1269&fromShare=true&action=default&mobileredirect=true
+- Setup Free Checkpoint Account - https://trten.sharepoint.com/sites/TRTAKSCheckpointAnswers/_layouts/15/stream.aspx?id=%2Fsites%2FTRTAKSCheckpointAnswers%2FShared%20Documents%2FGeneral%2FKnowledge%20Sharing%20%28KT%20session%29%2FAPI%20Access%20Keys%2FApproved%20Setup%20of%20Free%20CP%20Account%2D20230623%5F141203%2DMeeting%20Recording%2Emp4&referrer=StreamWebApp%2EWeb&referrerScenario=AddressBarCopied%2Eview%2E1e9c7216%2D2fbb%2D4346%2Dac5c%2D5fcf7358ab2b
