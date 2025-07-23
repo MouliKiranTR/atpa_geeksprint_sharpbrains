@@ -1,0 +1,4 @@
+Here are the documents to set up the TRTA Search application in the local environment.
+
+- Instructions to get Developer Access to Rocks DB files ([DeveloperAccessToRocksDBFiles.docx](https://trten.sharepoint.com/:w:/r/sites/LegalCobaltPlatformSearchCommunity/_layouts/15/Doc.aspx?sourcedoc=%7B4DE639D4-5D21-4901-B2A7-F1F8C84A8CB0%7D&file=DeveloperAccessToRocksDBFiles.docx&wdOrigin=TEAMS-MAGLEV.p2p_ns.rwc&action=default&mobileredirect=true))
+- Setup guide for TRTA Search Application with RocksDB in IntelliJ IDEA] ([TRTA Setup - IDEA - Windows.docx](https://trten.sharepoint.com/:w:/r/sites/CobaltDataCenterExit/_layouts/15/doc2.aspx?action=default&DefaultItemOpen=1&file=TRTA%20Setup%20-%20IDEA%20-%20Windows.docx&mobileredirect=true&sourcedoc=%7B598562A0-2361-4F86-81D0-DF6B809770E2%7D)) 
