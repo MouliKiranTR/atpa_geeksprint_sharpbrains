@@ -1,0 +1,4 @@
+![Checkpoint_Answers.png](/.attachments/Checkpoint_Answers-cda1c1b3-aa1a-4f38-a12b-9ec57ed1e99e.png)
+
+# References
+- Checkpoint Answers Recording (Andy) - [Checkpoint Answers Overview_Transition.mp4](https://trten.sharepoint.com/sites/TRTAKSCheckpointAnswers/_layouts/15/stream.aspx?id=%2Fsites%2FTRTAKSCheckpointAnswers%2FShared%20Documents%2FGeneral%2F06%20Knowledge%20Base%2FKnowledge%20Sharing%20%28KT%20session%29%2FCheckpoint%20%2D%20Knowledge%20Repo%2FRecordings%2FCheckpoint%20Answers%20Overview%5FTransition%2Emp4&referrer=StreamWebApp%2EWeb&referrerScenario=AddressBarCopied%2Eview%2E4181ce86%2D4dc0%2D472c%2Db436%2Dda9d8bbb6ee7)
