@@ -38,25 +38,70 @@ class EnhancedOpenArenaService:
             Formatted prompt for OpenArena
         """
         
-        # Concise system context
+        # Base system context
         base_context = """
-You are an expert Technical Analyst specializing in architecture, 
-design, and system analysis. Analyze visual content and provide 
-actionable insights.
+You are an expert Onboarding Knowledge Agent designed to help new team 
+members, users, and stakeholders understand systems, processes, and 
+organizational knowledge.
 
 CORE CAPABILITIES:
-- System Architecture & Component Analysis
-- Process Flow & Workflow Documentation  
-- Technical Design & Integration Patterns
-- Data Flow & Security Architecture
-- Performance & Scalability Assessment
+- System Architecture Analysis: Understand and explain technical systems, 
+  data flows, and integration points
+- Process Documentation: Break down workflows, procedures, and business 
+  processes
+- Knowledge Synthesis: Connect information across different sources and 
+  formats
+- Contextual Guidance: Provide relevant, actionable advice based on 
+  specific situations
+- Progressive Learning: Adapt explanations to user expertise level
 
-RESPONSE APPROACH:
-- Executive summary with key findings
-- Visual content analysis with specific references
-- Technical insights and recommendations
-- Clear, structured markdown formatting
-- Actionable next steps
+ONBOARDING FOCUS AREAS:
+1. TECHNICAL SYSTEMS
+   - Architecture overviews and component relationships
+   - API documentation and integration patterns
+   - Database schemas and data models
+   - Security protocols and access patterns
+   - Development workflows and deployment processes
+
+2. BUSINESS PROCESSES
+   - Operational workflows and decision trees
+   - Approval processes and escalation paths
+   - Communication protocols and stakeholder mapping
+   - Quality assurance and compliance procedures
+   - Project management methodologies
+
+3. ORGANIZATIONAL KNOWLEDGE
+   - Team structures and responsibilities
+   - Cultural norms and best practices
+   - Tool ecosystems and technology stack
+   - Documentation standards and knowledge repositories
+   - Training resources and learning paths
+
+RESPONSE GUIDELINES:
+- Start with a clear executive summary for complex topics
+- Provide step-by-step breakdowns for processes
+- Include relevant context and background information
+- Offer multiple perspectives when applicable
+- Suggest next steps and follow-up resources
+- Use clear headings and structured formatting
+- Include practical examples and use cases
+- Identify knowledge gaps and recommend documentation improvements
+
+ADAPTATION STRATEGIES:
+- For technical queries: Focus on architecture, APIs, and implementation 
+  details
+- For process queries: Emphasize workflows, dependencies, and decision 
+  points
+- For general onboarding: Provide comprehensive overviews with learning 
+  paths
+- For specific problems: Offer targeted solutions with context
+
+QUALITY STANDARDS:
+- Accurate and up-to-date information
+- Clear, jargon-free explanations with technical terms defined
+- Actionable recommendations and next steps
+- Structured presentation with visual aids when helpful
+- Cross-references to related systems and processes
         """
         
         # Create context about the visual content
@@ -129,35 +174,70 @@ RESPONSE APPROACH:
             
             visual_context += "\n"
         
-        # Concise analysis instructions
+        # Analysis type specific instructions
         type_instructions = {
-            "design": (
-                "🎨 DESIGN FOCUS: UI/UX patterns, visual hierarchy, "
-                "accessibility, design recommendations"
-            ),
-            "workflow": (
-                "⚡ WORKFLOW FOCUS: Process flows, bottlenecks, "
-                "user journeys, optimization opportunities"
-            ), 
-            "integration": (
-                "🔗 INTEGRATION FOCUS: System connections, "
-                "API patterns, data flows, architecture relationships"
-            ),
-            "architecture": (
-                "🏗️ ARCHITECTURE FOCUS: Component mapping, "
-                "data flows, scalability, security, technical debt"
-            ),
-            "general": (
-                "📊 GENERAL FOCUS: Comprehensive overview, "
-                "key insights, actionable recommendations"
-            )
+            "design": """
+            DESIGN ANALYSIS FOCUS:
+            - Evaluate visual hierarchy, typography, color schemes, and layout
+            - Assess accessibility and usability principles
+            - Identify design patterns and component usage
+            - Analyze information architecture and content organization
+            - Provide recommendations for design improvements
+            - If no visual content available, suggest design approaches and 
+              best practices
+            """,
+            
+            "workflow": """
+            WORKFLOW ANALYSIS FOCUS:
+            - Map out process flows and decision points
+            - Identify bottlenecks, inefficiencies, or gaps in the workflow
+            - Analyze user journey and interaction patterns
+            - Assess process complexity and potential simplifications
+            - Suggest process improvements and optimizations
+            - If no visual content available, recommend workflow 
+              documentation strategies
+            """,
+            
+            "integration": """
+            INTEGRATION ANALYSIS FOCUS:
+            - Identify data flows and system connections
+            - Analyze integration points and dependencies
+            - Assess API connections and data exchange patterns
+            - Evaluate system architecture and technical relationships
+            - Provide recommendations for better integration
+            - If no visual content available, suggest architecture 
+              documentation approaches
+            """,
+
+            "architecture": """
+            ARCHITECTURE ANALYSIS FOCUS:
+            - Complete component inventory and relationship mapping
+            - End-to-end data flow and process analysis
+            - Technology stack evaluation and optimization
+            - Security architecture and compliance frameworks
+            - Scalability, performance, and reliability analysis
+            - Design decision rationale and trade-off analysis
+            - Architectural debt and technical risk evaluation
+            - Modernization and refactoring recommendations
+            """,
+            
+            "general": """
+            GENERAL ANALYSIS FOCUS:
+            - Provide comprehensive overview of the visual content
+            - Identify key elements, patterns, and relationships
+            - Analyze purpose, functionality, and effectiveness
+            - Highlight important insights and observations
+            - Offer relevant recommendations and next steps
+            - If no visual content available, provide guidance on content 
+              creation
+            """
         }
         
         analysis_instruction = type_instructions.get(
             analysis_type, type_instructions["general"]
         )
         
-        # Construct final prompt with enhanced markdown instructions
+        # Construct final prompt
         final_prompt = f"""
         {base_context}
         
@@ -168,19 +248,16 @@ RESPONSE APPROACH:
         USER QUESTION:
         {user_question}
         
-        📝 MARKDOWN RESPONSE FORMAT:
+        ANALYSIS INSTRUCTIONS:
+        1. Carefully analyze all provided visual content and metadata
+        2. Focus on answering the user's specific question
+        3. Provide detailed insights based on what you can observe
+        4. Include specific examples and references to the visual elements
+        5. Offer actionable recommendations when appropriate
+        6. Structure your response clearly with headings and bullet points
+        7. If visual content is not available, base your analysis on metadata
         
-        Structure: ## 📋 Executive Summary | ## 🔍 Visual Analysis | 
-        ## 🏗️ Key Findings | ## 💡 Recommendations | ## 🔗 Next Steps
-        
-        Format: Use ## headers with emojis, **bold** for emphasis, 
-        `code` for technical terms, - for bullets, > for insights
-        
-        🔍 ANALYZE VISUAL CONTENT: If base64 data provided above, 
-        examine diagrams thoroughly and reference specific elements, 
-        components, flows, and patterns you observe.
-        
-        Provide comprehensive markdown analysis addressing the user's question.
+        Please provide a comprehensive analysis addressing the user's question.
         """
         
         return final_prompt.strip()
@@ -201,8 +278,7 @@ RESPONSE APPROACH:
         if not visual_data:
             return ""
             
-        visual_content_section = "\n\nVISUAL ATTACHMENTS FOR ANALYSIS:\n"
-        visual_content_section += "="*60 + "\n"
+        visual_content_section = "\n\nVISUAL CONTENT:\n"
         
         for i, item in enumerate(visual_data, 1):
             if not item.get("success"):
@@ -211,137 +287,12 @@ RESPONSE APPROACH:
             # Add base64 image data if available
             base64_data = item.get("screenshot_base64")
             if base64_data:
-                source = item.get('source', 'unknown').upper()
-                title = (
-                    item.get('diagram_title') or 
-                    item.get('file_name') or 
-                    f"{source} Content"
-                )
-                
+                filename = f"{item.get('source', 'unknown')}_{i}"
                 visual_content_section += (
-                    f"\n📊 VISUAL ATTACHMENT {i}: {title}\n"
+                    f"\n{filename}: [Image data: "
+                    f"{len(base64_data)} characters]\n"
                 )
-                visual_content_section += f"Source: {source}\n"
-                visual_content_section += "Data Type: Image/Diagram\n"
-                visual_content_section += (
-                    f"Size: {len(base64_data)} characters\n"
-                )
-                
-                # Include optimized base64 data for AI analysis
-                # Limit to ~15KB per image to stay within 32KB WebSocket limit
-                max_base64_length = 15000
-                if len(base64_data) > max_base64_length:
-                    truncated_data = base64_data[:max_base64_length]
-                    visual_content_section += (
-                        "\nImage Data (Base64 - Truncated):\n"
-                    )
-                    visual_content_section += f"{truncated_data}\n"
-                    visual_content_section += (
-                        f"[TRUNCATED: Showing {max_base64_length} of "
-                        f"{len(base64_data)} total characters]\n"
-                    )
-                else:
-                    visual_content_section += "\nImage Data (Base64):\n"
-                    visual_content_section += f"{base64_data}\n"
-                visual_content_section += "-" * 40 + "\n"
-        
-        if visual_content_section.count("📊 VISUAL ATTACHMENT") > 0:
-            visual_content_section += (
-                "\n🔍 ANALYSIS INSTRUCTION: Please carefully examine all "
-                "visual attachments above. The base64 encoded images contain "
-                "important diagrams, screenshots, or visual content that "
-                "should be analyzed in detail to answer the user's question.\n"
-            )
-        
-        return visual_content_section
-    
-    def _optimize_prompt_size(
-        self, 
-        final_prompt: str, 
-        visual_data: List[Dict[str, Any]]
-    ) -> str:
-        """
-        Optimize prompt size if it exceeds WebSocket limits
-        
-        Args:
-            final_prompt: The complete prompt
-            visual_data: Original visual data for re-processing
-            
-        Returns:
-            Optimized prompt that fits within size limits
-        """
-        max_size = 30000  # Leave 2KB buffer under 32KB limit
-        
-        if len(final_prompt.encode('utf-8')) <= max_size:
-            return final_prompt
-        
-        print("🔧 Optimizing prompt size for WebSocket transmission...")
-        
-        # Try reducing base64 data size further
-        if visual_data:
-            # Reduce base64 size more aggressively
-            smaller_visual_content = (
-                self._prepare_minimal_visual_content(visual_data)
-            )
-            
-            # Rebuild prompt with smaller visual content
-            base_prompt_parts = final_prompt.split(
-                "\n\nVISUAL ATTACHMENTS FOR ANALYSIS:"
-            )
-            if len(base_prompt_parts) > 1:
-                optimized_prompt = (
-                    base_prompt_parts[0] + smaller_visual_content
-                )
-                
-                if len(optimized_prompt.encode('utf-8')) <= max_size:
-                    print("✅ Prompt optimized successfully")
-                    return optimized_prompt
-        
-        # If still too large, remove visual content and use metadata only
-        metadata_only_prompt = final_prompt.split(
-            "\n\nVISUAL ATTACHMENTS FOR ANALYSIS:"
-        )[0]
-        
-        metadata_only_prompt += (
-            "\n\n📋 VISUAL CONTENT SUMMARY:\n"
-            "Visual attachments were too large for transmission. "
-            "Analysis based on metadata only.\n"
-        )
-        
-        print("⚠️ Using metadata-only analysis due to size constraints")
-        return metadata_only_prompt
-    
-    def _prepare_minimal_visual_content(
-        self, 
-        visual_data: List[Dict[str, Any]]
-    ) -> str:
-        """
-        Prepare minimal visual content for size-constrained scenarios
-        """
-        visual_content_section = "\n\nVISUAL ATTACHMENTS (MINIMAL):\n"
-        visual_content_section += "="*40 + "\n"
-        
-        for i, item in enumerate(visual_data, 1):
-            if not item.get("success"):
-                continue
-                
-            base64_data = item.get("screenshot_base64")
-            if base64_data:
-                source = item.get('source', 'unknown').upper()
-                title = (
-                    item.get('diagram_title') or 
-                    item.get('file_name') or 
-                    f"{source} Content"
-                )
-                
-                visual_content_section += f"📊 {i}: {title}\n"
-                
-                # Very small base64 sample (first 5KB only)
-                mini_sample = base64_data[:5000]
-                visual_content_section += f"Sample: {mini_sample}...\n"
-                visual_content_section += (
-                    f"[{len(base64_data)} chars total]\n\n"
-                )
+                visual_content_section += f"Base64: {base64_data[:100]}...\n"
         
         return visual_content_section
     
@@ -372,21 +323,6 @@ RESPONSE APPROACH:
         }
         
         print("🔗 Connecting to OpenArena via WebSocket...")
-        
-        # Monitor prompt size to avoid WebSocket frame limit (32KB)
-        prompt_size = len(final_prompt.encode('utf-8'))
-        prompt_size_kb = prompt_size / 1024
-        
-        print(f"📏 Prompt size: {prompt_size_kb:.1f}KB")
-        
-        if prompt_size > 30000:  # Warn if approaching 32KB limit
-            print("⚠️ WARNING: Prompt size approaching WebSocket limit (32KB)")
-        
-        # Count visual attachments
-        visual_count = final_prompt.count("📊 VISUAL ATTACHMENT")
-        if visual_count > 0:
-            print(f"📎 Sending {visual_count} visual attachments for analysis")
-        
         ws = connect(url)
         ws.send(json.dumps(message))
         
@@ -394,7 +330,6 @@ RESPONSE APPROACH:
         cost_tracker = {}
         eof = False
         
-        print("📨 Receiving analysis response...")
         while not eof:
             message = ws.recv()
             message_data = json.loads(message)
@@ -445,12 +380,7 @@ RESPONSE APPROACH:
             visual_content = self._prepare_visual_content_for_prompt(
                 visual_data
             )
-            initial_prompt = base_prompt + visual_content
-            
-            # Optimize prompt size for WebSocket transmission
-            final_prompt = self._optimize_prompt_size(
-                initial_prompt, visual_data
-            )
+            final_prompt = base_prompt + visual_content
             
             print(f"📊 Processing {len(visual_data)} visual items")
             print(f"🎯 Analysis type: {analysis_type}")
@@ -586,12 +516,12 @@ RESPONSE APPROACH:
         # Fix multiple consecutive newlines
         markdown_content = re.sub(r'\n{3,}', '\n\n', markdown_content)
         
-        # Only add metadata if the AI didn't generate proper headers
-        if (not markdown_content.startswith('##') and 
-                not markdown_content.startswith('# ')):
+        # Add metadata section at the top if not present
+        if not markdown_content.startswith('# '):
             title = self._generate_title(analysis_type)
             metadata_section = f"""# {title}
 
+**Analysis Type:** {analysis_type.title()}
 **Query:** {user_question}
 **Generated:** {self._get_current_timestamp()}
 
@@ -599,6 +529,10 @@ RESPONSE APPROACH:
 
 """
             markdown_content = metadata_section + markdown_content
+        
+        # Add footer with helpful information
+        footer = self._generate_markdown_footer(analysis_type)
+        markdown_content += footer
         
         return markdown_content.strip()
     
