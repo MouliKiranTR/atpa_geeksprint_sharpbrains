@@ -10,7 +10,7 @@ from app.services.lucid_service import LucidService
 from app.services.visual_capture_service import visual_capture_service
 from app.services.enhanced_openarena_service import enhanced_openarena_service
 from app.services.data_source_service import data_source_service
-from app.services.wiki_search_service import wiki_search_service
+from app.services.wiki_search_service import WikiSearchService
 
 
 class EnhancedQueryService:
@@ -374,7 +374,7 @@ class EnhancedQueryService:
     async def _search_wiki_content(self, query: str) -> Dict[str, Any]:
         """Search wiki documents based on query"""
         try:
-            wiki_results = await wiki_search_service.search(query)
+            wiki_results = await WikiSearchService.search(query)
             
             return {
                 "wiki_documents": wiki_results,
