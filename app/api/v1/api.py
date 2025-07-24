@@ -5,7 +5,7 @@ Main API router for v1 endpoints
 from fastapi import APIRouter
 from app.api.v1.endpoints import (
     query, upload, health, program_generation, 
-    lucid_mcp, figma_mcp, enhanced_query, cache_management, chat
+    lucid_mcp, figma_mcp, enhanced_query, cache_management, chat, github
 )
 
 api_router = APIRouter()
@@ -55,4 +55,9 @@ api_router.include_router(
     chat.router,
     prefix="/chat",
     tags=["chat"]
+)
+api_router.include_router(
+    github.router,
+    prefix="/github",
+    tags=["github"]
 ) 

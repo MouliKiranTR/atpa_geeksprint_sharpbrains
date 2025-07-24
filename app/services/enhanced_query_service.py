@@ -10,6 +10,7 @@ from app.services.lucid_service import LucidService
 from app.services.visual_capture_service import visual_capture_service
 from app.services.enhanced_openarena_service import enhanced_openarena_service
 from app.services.data_source_service import data_source_service
+from app.services.github_service import github_service
 
 
 class EnhancedQueryService:
@@ -25,6 +26,7 @@ class EnhancedQueryService:
         include_figma: bool = True,
         include_lucid: bool = True,
         include_documents: bool = True,
+        include_github: bool = True,
         max_visual_items: int = 3
     ) -> Dict[str, Any]:
         """
@@ -36,6 +38,7 @@ class EnhancedQueryService:
             include_figma: Whether to search Figma files
             include_lucid: Whether to search Lucid diagrams
             include_documents: Whether to search uploaded documents
+            include_github: Whether to search GitHub repositories
             max_visual_items: Maximum visual items to process
             
         Returns:
@@ -55,6 +58,14 @@ class EnhancedQueryService:
                 "dashboard", "visualization", "graphic", "drawing", "sketch"
             ]
             
+            # GitHub-specific keywords for code/repository searches
+            github_keywords = [
+                "code", "repository", "repo", "github", "implementation", 
+                "source", "function", "class", "method", "library", "framework",
+                "package", "dependency", "version", "commit", "branch", "pr",
+                "pull request", "issue", "bug", "feature", "documentation"
+            ]
+            
             # Architecture-specific keywords for specialized analysis
             architecture_keywords = [
                 "architecture", "system", "checkpoint", "component", "integration",
@@ -67,6 +78,12 @@ class EnhancedQueryService:
             is_visual_query = any(
                 keyword in user_question.lower() 
                 for keyword in visual_keywords
+            )
+            
+            # Check if this is specifically a GitHub/code query
+            is_github_query = any(
+                keyword in user_question.lower() 
+                for keyword in github_keywords
             )
             
             # Check if this is specifically an architecture question
@@ -82,6 +99,7 @@ class EnhancedQueryService:
             
             results = {
                 "is_visual_query": is_visual_query,
+                "is_github_query": is_github_query,
                 "is_architecture_query": is_architecture_query,
                 "analysis_approach": analysis_approach,
                 "query_analysis": {
@@ -117,6 +135,10 @@ class EnhancedQueryService:
                     self._search_document_content(user_question)
                 )
                 task_labels.append("documents")
+            
+            if include_github:
+                search_tasks.append(self._search_github_content(user_question))
+                task_labels.append("github")
             
             # Execute all searches in parallel
             if search_tasks:
@@ -182,6 +204,26 @@ class EnhancedQueryService:
                         }
                     })
             
+            # Add GitHub repositories/code to context items
+            if results["search_results"].get("github_repositories"):
+                remaining_slots = max_visual_items - len(visual_items)
+                github_repos = results["search_results"][
+                    "github_repositories"
+                ][:remaining_slots]
+                for repo in github_repos:
+                    visual_items.append({
+                        "type": "github_repo",
+                        "id": repo.full_name,
+                        "name": repo.name,
+                        "source_info": {
+                            "description": repo.description,
+                            "language": repo.language,
+                            "stars": repo.stars,
+                            "url": repo.url,
+                            "owner": repo.owner
+                        }
+                    })
+            
             # 🎯 OPENARENA ANALYSIS - Pass consolidated results to OpenArena
             if visual_items or results["search_results"]:
                 
@@ -213,6 +255,18 @@ class EnhancedQueryService:
                         "capture_method": "context_extraction"
                     })
                 
+                # Add GitHub context to visual data if available
+                if results["search_results"].get("github_repositories") or results["search_results"].get("github_code"):
+                    github_context = self._prepare_github_context(
+                        results["search_results"]
+                    )
+                    visual_data.append({
+                        "success": True,
+                        "source": "github",
+                        "metadata": github_context,
+                        "capture_method": "api_extraction"
+                    })
+                
                 # Add search metadata to visual data
                 search_metadata = {
                     "sources_searched": task_labels,
@@ -224,6 +278,9 @@ class EnhancedQueryService:
                     ),
                     "total_documents": len(
                         results["search_results"].get("documents", [])
+                    ),
+                    "total_github_repos": len(
+                        results["search_results"].get("github_repositories", [])
                     ),
                     "query_type": results["query_analysis"]["analysis_type"]
                 }
@@ -360,6 +417,39 @@ class EnhancedQueryService:
             }
         except Exception:
             return {}
+    
+    async def _search_github_content(self, query: str) -> Dict[str, Any]:
+        """Search GitHub repositories and code based on query"""
+        try:
+            # Search repositories
+            repo_response = await github_service.search_repositories(
+                query=query,
+                limit=5
+            )
+            
+            # Search code if query seems code-related
+            code_keywords = ["function", "class", "method", "import", "def", "var", "const"]
+            search_code = any(keyword in query.lower() for keyword in code_keywords)
+            
+            result = {
+                "github_repositories": repo_response.repositories,
+                "github_search_meta": {
+                    "total_repos": repo_response.total_count,
+                    "has_more": repo_response.has_more,
+                    "search_query": query
+                }
+            }
+            
+            if search_code:
+                code_response = await github_service.search_code(
+                    query=query,
+                    limit=3
+                )
+                result["github_code"] = code_response
+            
+            return result
+        except Exception:
+            return {}
 
     def _determine_architecture_reasoning_focus(
         self, user_question: str
@@ -437,6 +527,54 @@ class EnhancedQueryService:
             "document_count": len(documents),
             "total_length": len(doc_context)
         }
+    
+    def _prepare_github_context(
+        self, 
+        search_results: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Prepare GitHub context for OpenArena analysis
+        
+        Args:
+            search_results: GitHub search results
+            
+        Returns:
+            GitHub context metadata
+        """
+        context = {"repositories": [], "code_results": []}
+        
+        # Process repository results
+        if search_results.get("github_repositories"):
+            for repo in search_results["github_repositories"][:3]:
+                context["repositories"].append({
+                    "name": repo.name,
+                    "full_name": repo.full_name,
+                    "description": repo.description,
+                    "language": repo.language,
+                    "stars": repo.stars,
+                    "url": repo.url,
+                    "owner": repo.owner
+                })
+        
+        # Process code search results
+        if search_results.get("github_code"):
+            code_data = search_results["github_code"]
+            if code_data.get("code_results"):
+                for code in code_data["code_results"][:3]:
+                    context["code_results"].append({
+                        "repository": code.get("repository", {}).get("fullName", ""),
+                        "path": code.get("path", ""),
+                        "url": code.get("url", "")
+                    })
+        
+        # Add summary
+        context["summary"] = {
+            "total_repos": len(context["repositories"]),
+            "total_code_results": len(context["code_results"]),
+            "languages": list(set(repo["language"] for repo in context["repositories"] if repo["language"]))
+        }
+        
+        return context
 
     async def _format_comprehensive_response(
         self, 
@@ -502,6 +640,10 @@ class EnhancedQueryService:
         if search_results.get("documents"):
             count = len(search_results["documents"])
             search_summary.append(f"- **Documents:** {count} found")
+        
+        if search_results.get("github_repositories"):
+            count = len(search_results["github_repositories"])
+            search_summary.append(f"- **GitHub Repositories:** {count} found")
         
         # Add error information if any searches failed
         error_sources = [
