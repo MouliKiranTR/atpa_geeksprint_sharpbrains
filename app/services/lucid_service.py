@@ -455,11 +455,6 @@ class LucidService:
         else:
             headers["Accept"] = "image/png"  # Default to PNG
         
-        print(f"DEBUG: Exporting document {document_id} as {format}")
-        print(f"DEBUG: URL: {url}")
-        print(f"DEBUG: Params: {params}")
-        print(f"DEBUG: Headers: {headers}")
-        
         async with httpx.AsyncClient(verify=False) as client:
             try:
                 response = await client.get(
@@ -468,9 +463,6 @@ class LucidService:
                     params=params,
                     timeout=60.0  # Longer timeout for image export
                 )
-                
-                print(f"DEBUG: Export response status: {response.status_code}")
-                print(f"DEBUG: Export response headers: {dict(response.headers)}")
                 
                 response.raise_for_status()
                 
@@ -526,8 +518,6 @@ class LucidService:
                     
             except httpx.HTTPStatusError as e:
                 status_code = e.response.status_code
-                print(f"DEBUG: HTTPStatusError - Status: {status_code}")
-                print(f"DEBUG: Response text: {e.response.text}")
                 
                 error_msg = f"Lucid export failed: {status_code}"
                 if status_code == 401:
@@ -545,13 +535,11 @@ class LucidService:
                 }
                 
             except httpx.RequestError as e:
-                print(f"DEBUG: RequestError: {str(e)}")
                 return {
                     "success": False,
                     "error": f"Failed to connect to Lucid API: {str(e)}"
                 }
             except Exception as e:
-                print(f"DEBUG: Unexpected error: {str(e)}")
                 return {
                     "success": False,
                     "error": f"Unexpected error during export: {str(e)}"

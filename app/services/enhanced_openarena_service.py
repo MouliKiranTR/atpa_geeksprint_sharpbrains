@@ -580,6 +580,11 @@ Based on this {analysis_type} analysis, consider:
         
         return footer
 
+    def make_openarena_call(self, final_prompt: str) -> str:
+        """Make a call to OpenArena"""
+        answer, cost_tracker = self._query_openarena_websocket(final_prompt)
+        return answer, cost_tracker
+
 
 # Create service instance
 enhanced_openarena_service = EnhancedOpenArenaService() 

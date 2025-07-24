@@ -35,16 +35,20 @@ class ChatRequest(BaseModel):
         description="Previous chat messages for context"
     )
     include_figma: bool = Field(
-        default=True, 
+        default=False, 
         description="Whether to search Figma files"
     )
     include_lucid: bool = Field(
-        default=True, 
+        default=False, 
         description="Whether to search Lucid diagrams"
     )
     include_documents: bool = Field(
-        default=True, 
+        default=False, 
         description="Whether to search uploaded documents"
+    )
+    include_wiki: bool = Field(
+        default=False, 
+        description="Whether to search wiki documents"
     )
     max_visual_items: int = Field(
         default=3, 
@@ -133,11 +137,12 @@ async def send_chat_message(request: ChatRequest):
         current_history.append(user_message)
         
         # Perform enhanced query analysis
-        results = await enhanced_query_service.analyze_user_query(
+        results = await enhanced_query_service.chat_query(
             user_question=request.message,
             include_figma=request.include_figma,
             include_lucid=request.include_lucid,
             include_documents=request.include_documents,
+            include_wiki=request.include_wiki,
             max_visual_items=request.max_visual_items
         )
         

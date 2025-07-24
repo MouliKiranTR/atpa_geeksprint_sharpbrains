@@ -3,6 +3,7 @@ Enhanced Query Service that integrates Figma/Lucid search with visual analysis
 """
 
 import asyncio
+import os
 import time
 from typing import Dict, Any, List
 from app.services.figma_service import FigmaService
@@ -11,22 +12,32 @@ from app.services.visual_capture_service import visual_capture_service
 from app.services.enhanced_openarena_service import enhanced_openarena_service
 from app.services.data_source_service import data_source_service
 from app.services.wiki_search_service import WikiSearchService
+from app.services.prompt_service import PromptService
 
 
 class EnhancedQueryService:
     """Enhanced query service with visual content analysis"""
+    wiki_path = os.path.join(
+        os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__)
+        )), 
+        "resources", 
+        "wikis"
+    )
     
     def __init__(self):
         self.figma_service = FigmaService()
         self.lucid_service = LucidService()
+        self.wiki_service = WikiSearchService(self.wiki_path)
+        self.prompt_service = PromptService()
     
-    async def analyze_user_query(
+    async def chat_query(
         self,
         user_question: str,
-        include_figma: bool = True,
-        include_lucid: bool = True,
-        include_documents: bool = True,
-        include_wiki: bool = True,
+        include_figma: bool = False,
+        include_lucid: bool = False,
+        include_documents: bool = False,
+        include_wiki: bool = False,
         max_visual_items: int = 3
     ) -> Dict[str, Any]:
         """
@@ -46,62 +57,19 @@ class EnhancedQueryService:
         """
         start_time = time.time()
         temp_files_to_cleanup = []
+        final_prompt = (
+            self.prompt_service.getBasePrompt() + 
+            "\n" + self.prompt_service.getPromptRules()
+        )
+        
+        # Initialize results structure
+        results = {
+            "search_results": {},
+            "combined_response": "",
+            "cost_tracker": None
+        }
         
         try:
-            # Determine if query is visual-related (expanded keyword list)
-            visual_keywords = [
-                "figma", "lucid", "design", "diagram", "workflow", "process",
-                "visual", "interface", "ui", "ux", "chart", "flow", "mockup",
-                "wireframe", "prototype", "layout", "screen", "page",
-                "architecture", "system", "structure", "blueprint", "schema",
-                "checkpoint", "flowchart", "map", "model", "framework",
-                "dashboard", "visualization", "graphic", "drawing", "sketch"
-            ]
-            
-            # Architecture-specific keywords for specialized analysis
-            architecture_keywords = [
-                "architecture", "system", "checkpoint", "component", "integration",
-                "microservice", "api", "database", "network", "security", 
-                "deployment", "infrastructure", "topology", "schema", 
-                "pattern", "framework", "service", "endpoint", "data flow",
-                "communication", "scalability", "performance", "design pattern"
-            ]
-            
-            is_visual_query = any(
-                keyword in user_question.lower() 
-                for keyword in visual_keywords
-            )
-            
-            # Check if this is specifically an architecture question
-            is_architecture_query = any(
-                keyword in user_question.lower() 
-                for keyword in architecture_keywords
-            )
-            
-            # Determine analysis approach
-            analysis_approach = (
-                "architecture" if is_architecture_query else "general"
-            )
-            
-            results = {
-                "is_visual_query": is_visual_query,
-                "is_architecture_query": is_architecture_query,
-                "analysis_approach": analysis_approach,
-                "query_analysis": {
-                    "original_question": user_question,
-                    "analysis_type": (
-                        enhanced_openarena_service.determine_analysis_type(
-                            user_question
-                        )
-                    ),
-                    "processing_time": 0
-                },
-                "search_results": {},
-                "visual_analysis": None,
-                "document_analysis": None,
-                "combined_response": ""
-            }
-            
             # 🚀 PARALLEL SOURCE SEARCH - Search all enabled sources
             # Create search tasks for all enabled sources (parallel execution)
             search_tasks = []
@@ -114,12 +82,6 @@ class EnhancedQueryService:
             if include_lucid:
                 search_tasks.append(self._search_lucid_content(user_question))
                 task_labels.append("lucid")
-            
-            if include_documents:
-                search_tasks.append(
-                    self._search_document_content(user_question)
-                )
-                task_labels.append("documents")
             
             if include_wiki:
                 search_tasks.append(self._search_wiki_content(user_question))
@@ -142,35 +104,38 @@ class EnhancedQueryService:
                     elif result:
                         results["search_results"].update(result)
             
-            # 📊 CONSOLIDATE SEARCH RESULTS for OpenArena
-            
-            # Collect visual items from search results
+            # Add figma and Lucid diagrams to visual items
             visual_items = []
             
-            # Add Figma files to visual items
-            if results["search_results"].get("figma_files"):
-                figma_list = results["search_results"]["figma_files"]
-                figma_files = figma_list[:max_visual_items]
-                for file in figma_files:
+            figma_condition = (
+                include_figma and 
+                results["search_results"].get("figma_files")
+            )
+            if figma_condition:
+                remaining_slots = max_visual_items - len(visual_items)
+                figma_files = results["search_results"][
+                    "figma_files"
+                ][:remaining_slots]
+                for figma_file in figma_files:
                     visual_items.append({
-                        "type": "figma",
-                        "id": file.key,
-                        "name": file.name,
+                        "type": "figma", 
+                        "id": figma_file.key,
+                        "name": figma_file.name,
                         "source_info": {
                             "last_modified": getattr(
-                                file, 'last_modified', 'Unknown'
+                                figma_file, 'last_modified', 'Unknown'
                             ),
                             "thumbnail_url": getattr(
-                                file, 'thumbnail_url', ''
-                            ),
-                            "file_type": getattr(
-                                file, 'file_type', 'design'
+                                figma_file, 'thumbnail_url', None
                             )
                         }
                     })
             
-            # Add Lucid diagrams to visual items
-            if results["search_results"].get("lucid_diagrams"):
+            lucid_condition = (
+                include_lucid and 
+                results["search_results"].get("lucid_diagrams")
+            )
+            if lucid_condition:
                 remaining_slots = max_visual_items - len(visual_items)
                 lucid_diagrams = results["search_results"][
                     "lucid_diagrams"
@@ -189,116 +154,52 @@ class EnhancedQueryService:
                         }
                     })
             
-            # 🎯 OPENARENA ANALYSIS - Pass consolidated results to OpenArena
-            if visual_items or results["search_results"]:
-                
-                # Capture visual content if visual items found
-                visual_data = []
-                if visual_items:
-                    
-                    # Use consolidated visual capture service for file exports
-                    visual_data = await (
-                        visual_capture_service.capture_multiple_screenshots(
-                            visual_items, export_to_files=True
-                        )
+            visual_data = []
+            if visual_items:
+                visual_data = await (
+                    visual_capture_service.capture_multiple_screenshots(
+                        visual_items, export_to_files=False
                     )
-                    
-                    # Track files for cleanup
-                    for item in visual_data:
-                        if item.get("success") and item.get("file_path"):
-                            temp_files_to_cleanup.append(item["file_path"])
+                )
                 
-                # Add document context to visual data if available
-                if results["search_results"].get("documents"):
-                    document_context = self._prepare_document_context(
-                        results["search_results"]["documents"]
+                visual_content = (
+                    enhanced_openarena_service
+                    ._prepare_visual_content_for_prompt(visual_data)
+                )
+                final_prompt += self.prompt_service.getLucidPrompt(
+                    visual_content, user_question
+                )
+
+            # Add wiki documents
+            wiki_condition = (
+                include_wiki and 
+                results["search_results"].get("wiki_documents")
+            )
+            if wiki_condition:
+                wiki_documents = results["search_results"]["wiki_documents"]
+                final_prompt += self.prompt_service.getWikiPrompt(
+                    wiki_documents, user_question
+                )
+                
+            # send request to openarena
+            if include_figma or include_lucid or include_wiki:
+                answer, cost_tracker = (
+                    enhanced_openarena_service.make_openarena_call(
+                        final_prompt
                     )
-                    visual_data.append({
-                        "success": True,
-                        "source": "documents",
-                        "metadata": document_context,
-                        "capture_method": "context_extraction"
-                    })
-                
-                # Add search metadata to visual data
-                search_metadata = {
-                    "sources_searched": task_labels,
-                    "total_figma_files": len(
-                        results["search_results"].get("figma_files", [])
+                )
+                results.update({
+                    "combined_response": answer,
+                    "cost_tracker": cost_tracker
+                })
+            else:
+                results.update({
+                    "combined_response": (
+                        "Include at least one source to analyze"
                     ),
-                    "total_lucid_diagrams": len(
-                        results["search_results"].get("lucid_diagrams", [])
-                    ),
-                    "total_documents": len(
-                        results["search_results"].get("documents", [])
-                    ),
-                    "total_wiki_documents": len(
-                        results["search_results"].get("wiki_documents", [])
-                    ),
-                    "query_type": results["query_analysis"]["analysis_type"]
-                }
-                
-                visual_data.append({
-                    "success": True,
-                    "source": "query_analysis",
-                    "metadata": search_metadata,
-                    "capture_method": "search_aggregation"
+                    "cost_tracker": 0
                 })
                 
-                # 🏗️ Choose appropriate OpenArena analysis method
-                if is_architecture_query:
-                    
-                    # Use unified analysis method for architecture analysis
-                    visual_analysis = await (
-                        enhanced_openarena_service.analyze_content(
-                            user_question=user_question,
-                            visual_data=visual_data,
-                            analysis_type="architecture"
-                        )
-                    )
-                else:
-                    
-                    visual_analysis = await (
-                        enhanced_openarena_service.analyze_visual_content(
-                            user_question=user_question,
-                            visual_data=visual_data,
-                            analysis_type=results["query_analysis"][
-                                "analysis_type"
-                            ],
-                            include_screenshots=bool(visual_items)
-                        )
-                    )
-                
-                # Store analysis results
-                results["visual_analysis"] = visual_analysis
-                
-                # Format comprehensive response
-                results["combined_response"] = await (
-                    self._format_comprehensive_response(
-                        user_question=user_question,
-                        search_results=results["search_results"],
-                        visual_analysis=visual_analysis,
-                        analysis_approach=analysis_approach,
-                        sources_searched=task_labels
-                    )
-                )
-                
-            else:
-                
-                # Create fallback response when no sources return results
-                results["combined_response"] = await (
-                    self._format_no_results_response(
-                        user_question=user_question,
-                        sources_searched=task_labels,
-                        errors=results["search_results"]
-                    )
-                )
-            
-            # Set processing time
-            results["query_analysis"]["processing_time"] = (
-                time.time() - start_time
-            )
-            
             return results
             
         except Exception as e:
@@ -359,31 +260,32 @@ class EnhancedQueryService:
             }
         except Exception:
             return {}
-    
-    async def _search_document_content(self, query: str) -> Dict[str, Any]:
-        """Search uploaded documents based on query"""
-        try:
-            documents = await data_source_service.search_documents(query)
-            
-            return {
-                "documents": documents
-            }
-        except Exception:
-            return {}
 
     async def _search_wiki_content(self, query: str) -> Dict[str, Any]:
         """Search wiki documents based on query"""
+        print(f"Searching wiki for {query}")
         try:
-            wiki_results = await WikiSearchService.search(query)
+            # Remove await - search method is not async
+            search_terms = query.split()
+            wiki_results = self.wiki_service.search(search_terms)
             
+            # wiki_results is a dict, not a list, so wrap it in a list
             return {
-                "wiki_documents": wiki_results,
+                "wiki_documents": [wiki_results] if wiki_results else [],
                 "wiki_search_meta": {
-                    "total_count": len(wiki_results) if wiki_results else 0,
+                    "total_count": (
+                        wiki_results.get("files_with_matches", 0) 
+                        if wiki_results else 0
+                    ),
+                    "total_matches": (
+                        wiki_results.get("total_matches", 0) 
+                        if wiki_results else 0
+                    ),
                     "search_query": query
                 }
             }
-        except Exception:
+        except Exception as e:
+            print(f"Error searching wiki for {query}: {str(e)}")
             return {}
 
     def _determine_architecture_reasoning_focus(
