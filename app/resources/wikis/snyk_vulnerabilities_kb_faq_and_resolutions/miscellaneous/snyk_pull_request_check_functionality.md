@@ -1,0 +1,1 @@
+Please check out this Atrium link for more details - https://trten.sharepoint.com/sites/intr-application-security/SitePages/news-Snyk-Pull-Request-Check-Functionality---Final-Rollout.aspx

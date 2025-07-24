@@ -10,6 +10,7 @@ from app.services.lucid_service import LucidService
 from app.services.visual_capture_service import visual_capture_service
 from app.services.enhanced_openarena_service import enhanced_openarena_service
 from app.services.data_source_service import data_source_service
+from app.services.wiki_search_service import WikiSearchService
 
 
 class EnhancedQueryService:
@@ -25,6 +26,7 @@ class EnhancedQueryService:
         include_figma: bool = True,
         include_lucid: bool = True,
         include_documents: bool = True,
+        include_wiki: bool = True,
         max_visual_items: int = 3
     ) -> Dict[str, Any]:
         """
@@ -36,6 +38,7 @@ class EnhancedQueryService:
             include_figma: Whether to search Figma files
             include_lucid: Whether to search Lucid diagrams
             include_documents: Whether to search uploaded documents
+            include_wiki: Whether to search wiki documents
             max_visual_items: Maximum visual items to process
             
         Returns:
@@ -117,6 +120,10 @@ class EnhancedQueryService:
                     self._search_document_content(user_question)
                 )
                 task_labels.append("documents")
+            
+            if include_wiki:
+                search_tasks.append(self._search_wiki_content(user_question))
+                task_labels.append("wiki")
             
             # Execute all searches in parallel
             if search_tasks:
@@ -224,6 +231,9 @@ class EnhancedQueryService:
                     ),
                     "total_documents": len(
                         results["search_results"].get("documents", [])
+                    ),
+                    "total_wiki_documents": len(
+                        results["search_results"].get("wiki_documents", [])
                     ),
                     "query_type": results["query_analysis"]["analysis_type"]
                 }
@@ -357,6 +367,21 @@ class EnhancedQueryService:
             
             return {
                 "documents": documents
+            }
+        except Exception:
+            return {}
+
+    async def _search_wiki_content(self, query: str) -> Dict[str, Any]:
+        """Search wiki documents based on query"""
+        try:
+            wiki_results = await WikiSearchService.search(query)
+            
+            return {
+                "wiki_documents": wiki_results,
+                "wiki_search_meta": {
+                    "total_count": len(wiki_results) if wiki_results else 0,
+                    "search_query": query
+                }
             }
         except Exception:
             return {}
@@ -502,6 +527,10 @@ class EnhancedQueryService:
         if search_results.get("documents"):
             count = len(search_results["documents"])
             search_summary.append(f"- **Documents:** {count} found")
+        
+        if search_results.get("wiki_documents"):
+            count = len(search_results["wiki_documents"])
+            search_summary.append(f"- **Wiki Documents:** {count} found")
         
         # Add error information if any searches failed
         error_sources = [

@@ -1,0 +1,1 @@
+Please consult the updated documentation in the next link: https://dev.azure.com/tr-tax-checkpoint/Checkpoint/_git/cp-ui?path=/README.md&_a=preview

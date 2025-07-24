@@ -1,0 +1,55 @@
+# Table of Contents Service
+- DynamoDB table:
+    - DEV: [a205159-cp-toc-dev-table-of-contents](https://console.aws.amazon.com/dynamodb/home?region=us-east-1#tables:selected=a205159-cp-toc-dev-table-of-contents;tab=items) **Note:** not used by the intuituve Search  cluster
+- ECS Container. Populates the Intuitive Search ES indices.
+    - Repository: [cp-search-ingestion-initial](https://dev.azure.com/tr-tax-checkpoint/Checkpoint/_git/cp-search-ingestion-initial?path=/src/main/java/com/trgr/trta/search/ingestion/initial/infrastructure/spring/Application.java)
+    - Jenkins Job: [cp-search-ingestion-initial](https://devops-jenkins.tr-tax-cp-preprod.aws-int.thomsonreuters.com/job/pipelines/job/Checkpoint/job/cp-search-ingestion-initial/). **Note:** DISABLED
+    - ECR Repository: [a205159-cp-ingestion](https://us-east-1.console.aws.amazon.com/ecr/repositories/private/401148645463/a205159-cp-ingestion)
+    - ECS Task: a205159-ingestion-initial. **Note:** DEREGISTERED
+- Lambda ingesting Kinesis "Content" stream to populate Intuituve Search ES index.
+    - AWS Lambda:
+        - DEV: [a205159-checkpoint-dev-ingestion](https://us-east-1.console.aws.amazon.com/lambda/home?region=us-east-1#/functions/a205159-checkpoint-dev-ingestion?tab=code). **Note:** DELETED
+        - TEST: [a205159-checkpoint-test-ingestion](https://us-east-1.console.aws.amazon.com/lambda/home?region=us-east-1#/functions/a205159-checkpoint-test-ingestion?tab=code). **Note:** DELETED
+        - QED [a205159-checkpoint-qed-ingestion](https://us-east-1.console.aws.amazon.com/lambda/home?region=us-east-1#/functions/a205159-checkpoint-qed-ingestion?tab=code). **Note:** DELETED
+    - SQS queue on failure: 
+        - DEV: [a205159-checkpoint-dev-ingestion-kinesis-dlq](https://us-east-1.console.aws.amazon.com/sqs/v2/home?region=us-east-1#/queues/https%3A%2F%2Fsqs.us-east-1.amazonaws.com%2F401148645463%2Fa205159-checkpoint-dev-ingestion-kinesis-dlq) **Note:** DELETED
+        - TEST: [a205159-checkpoint-dev-ingestion-kinesis-dlq](https://us-east-1.console.aws.amazon.com/sqs/v2/home?region=us-east-1#/queues/https%3A%2F%2Fsqs.us-east-1.amazonaws.com%2F401148645463%2Fa205159-checkpoint-test-ingestion-kinesis-dlq)**Note:** DELETED
+        - QED: [a205159-checkpoint-dev-ingestion-kinesis-dlq](https://us-east-1.console.aws.amazon.com/sqs/v2/home?region=us-east-1#/queues/https%3A%2F%2Fsqs.us-east-1.amazonaws.com%2F401148645463%2Fa205159-checkpoint-qed-ingestion-kinesis-dlq)**Note:** DELETED
+    - Repository: [cp-search-ingestion-lambda](https://dev.azure.com/tr-tax-checkpoint/Checkpoint/_git/cp-search-ingestion-lambda?path=/src/main/java/com/trgr/trta/search/ingestion/lambda/infrastructure/lambda/Handler.java)
+    - Jenkins Job: [cp-search-ingestion-lambda](https://devops-jenkins.tr-tax-cp-preprod.aws-int.thomsonreuters.com/job/pipelines/job/Checkpoint/job/cp-search-ingestion-lambda/). **Note:** DISABLED
+- Library that allows taking documents from the content S3 bucket, transforms them for search purposes, and stores them in an Elasticsearch engine.
+    - Repository: [cp-search-ingestion-common](https://dev.azure.com.mcas.ms/tr-tax-checkpoint/Checkpoint/_git/cp-search-ingestion-common)
+    - Jenkins job: [cp-search-ingestion-common](https://cpdevops-jenkins.tr-tax-cp-preprod.aws-int.thomsonreuters.com/job/pipelines/job/Checkpoint/job/cp-search-ingestion-common/). **Note:** DISABLED
+- Lambda handling ingestion from document metadata JSON file: 
+    - AWS Lambda: [a205159-cp-search-toc-ingestion-lambda-test](https://console.aws.amazon.com/lambda/home?region=us-east-1#/functions/a205159-cp-search-toc-ingestion-lambda-test?tab=configuration) **Note:** Not used by the intuitive search cluster and its dependent on the DynamoDB
+    - AWS Lambda [Wrong name]: [a20515-cp-search-toc-ingestion-lambda-test](https://us-east-1.console.aws.amazon.com/lambda/home?region=us-east-1#/functions/a20515-cp-search-toc-ingestion-lambda-test?tab=code). **Note:** Need to delete
+    - AWS Lambda [Wrong name]: [cp-search-toc-ingestion-lambda-test](https://us-east-1.console.aws.amazon.com/lambda/home?region=us-east-1#/functions/cp-search-toc-ingestion-lambda-test?tab=code). **Note:** Need to delete
+    - Repository: [cp-search-toc-ingestion-lambda](https://dev.azure.com/tr-tax-checkpoint/Checkpoint/_git/cp-search-toc-ingestion-lambda)
+    - Jenkins job: 
+- lambda returning root nodes: 
+    - AWS Lambda: [a205159-cp-search-toc-get-roots-lambda-test](https://console.aws.amazon.com/lambda/home?region=us-east-1#/functions/a205159-cp-search-toc-get-roots-lambda-test?tab=configuration). **Note:** Not used by the intuitive search cluster and its dependent on the DynamoDB
+    - Repository: [cp-search-toc-lambda](https://dev.azure.com/tr-tax-checkpoint/Checkpoint/_git/cp-search-toc-lambda?path=/src/main/java/com/tr/checkpoint/toc/RootNodesProvider.java&_a=contents&version=GBmaster), Handler: RootNodesProvider
+    - Jenkins job: 
+- lambda returning children of a specified node:
+    - AWS Lambda: [a205159-cp-search-toc-get-children-lambda-test](https://console.aws.amazon.com/lambda/home?region=us-east-1#/functions/a205159-cp-search-toc-get-children-lambda-test?tab=configuration).**Note:** Not used by the intuitive search cluster and its dependent on the DynamoDB
+    - Repository: [cp-search-toc-lambda](https://dev.azure.com/tr-tax-checkpoint/Checkpoint/_git/cp-search-toc-lambda?path=/src/main/java/com/tr/checkpoint/toc/ChildNodesProvider.java&_a=contents&version=GBmaster), Handler: ChildNodesProvider
+    - Jenkins job: 
+- Silver data and machine learning for TR Checkpoint project
+    - Repository: [cp-trcpml](https://dev.azure.com/tr-tax-checkpoint/Checkpoint/_git/cp-trcpml)
+- Proxy Lambda to trigger Step Functions
+    - Repository: [cp-content-workflow-processing](https://dev.azure.com/tr-tax-checkpoint/Checkpoint/_git/cp-content-workflow-processing)
+    - AWS Lambda: [a205159-cp-test-content-workflow-processing](https://us-east-1.console.aws.amazon.com/lambda/home?region=us-east-1#/functions/a205159-cp-test-content-workflow-processing)
+    - SQS Queue: [a205159-step-sqs](https://us-east-1.console.aws.amazon.com/sqs/v2/home?region=us-east-1#/queues/https%3A%2F%2Fsqs.us-east-1.amazonaws.com%2F401148645463%2Fa205159-step-sqs)
+    - Step Function: [a205159-cp-content-workflow-stepfunction-test](https://us-east-1.console.aws.amazon.com/states/home?region=us-east-1#/statemachines/view/arn:aws:states:us-east-1:401148645463:stateMachine:a205159-cp-content-workflow-stepfunction-test) **Note:** Need to delete
+    - Step Function [Wrong Name]: [cp-content-workflow-stepfunction-test](https://us-east-1.console.aws.amazon.com/states/home?region=us-east-1#/statemachines/view/arn:aws:states:us-east-1:401148645463:stateMachine:cp-content-workflow-stepfunction-test). **Note:** Need to delete
+    - Step Lambdas:
+        - [a205159-cp-test-stepfunction-metadata-publisher](https://us-east-1.console.aws.amazon.com/lambda/home?region=us-east-1#/functions/a205159-cp-test-stepfunction-metadata-publisher?tab=code). **Note:** Need to delete
+        - [a205159-cp-test-stepfunction-html-publisher](https://us-east-1.console.aws.amazon.com/lambda/home?region=us-east-1#/functions/a205159-cp-test-stepfunction-html-publisher?tab=code). **Note:** Need to delete
+        - [a205159-cp-test-stepfunction-json-publisher](https://us-east-1.console.aws.amazon.com/lambda/home?region=us-east-1#/functions/a205159-cp-test-stepfunction-json-publisher?tab=code). **Note:** Need to delete
+- Opensearch cluster. Consumed by the cp-search-service..
+    - Domain: [a205159-intuitivesearch-qed](https://us-east-1.console.aws.amazon.com/aos/home?region=us-east-1#opensearch/domains/a205159-intuitivesearch-qed)**Note:** Deleted
+    - Domain: [a205159-cp-nonprod-74-domain](https://us-east-1.console.aws.amazon.com/aos/home?region=us-east-1#opensearch/domains/a205159-cp-nonprod-74-domain). **Note:** IS-related Indices deleted.
+- Intuitive search service
+    - EC2 instances. **Note:** Removed
+    - Repository: https://dev.azure.com/tr-tax-checkpoint/Checkpoint/_git/cp-intuitive-search
+    - Jenkins job:

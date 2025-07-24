@@ -1,0 +1,5 @@
+ - Different types of batch jobs and when they run
+    - Emails Newsletter (run daily 8:30 ) - runs daily from Monday thru Friday 8:30 AM EST
+    - Newsflash - Tuesday thru Saturday.. 
+    - Whenever EY files are placed on the server, the newsflash will create nwf, tar, and zip files for the HTM, and then generate emails(Newsflash emails) for the HTM files which will then be processed continuously with each file being triggered for processing every 10 minutes.
+    - Previously, the newsflash process was scheduled to run between 4:30 PM IST and 8:30 AM IST. However, after migrating to SFTP, the newsflash now runs throughout the day.

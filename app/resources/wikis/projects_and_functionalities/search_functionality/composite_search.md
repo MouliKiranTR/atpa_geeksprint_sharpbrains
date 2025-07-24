@@ -1,0 +1,7 @@
+Normally, when we search for multiple search categories their search results are cached in cp web app session. When user clicks on the search category on search results page cp web app find search results in the session and displays it on the page. If search results exceed 2000 the are not returned and are not cached in session. As a result content types without search results are not shown on search results page. 
+
+For example, before KPMG composite search was implemented, if user selected Editorial Materials, Primary Source materials and KPMG Content searching for "interest" search results for KPMG content Content type did not show on search results page because the number of search results for Editorial Materials and Primary Source Materials combined exceeded 2000. Therefore the number of KPMG search results was zero.  
+
+To remedy the problem KPMG search category was configured to be a composite type. When search category is a composite type it will be visible on search results page. When user clicks on it instead of trying to get search results from the session another search is performed in that search category and its search results are displayed.
+
+Here is [CP Web App PR](https://dev.azure.com/tr-tax-checkpoint/Checkpoint/_git/cp-web-app/pullrequest/12783) and [CP Publishing PR](https://dev.azure.com/tr-tax-checkpoint/Checkpoint/_git/cp-publishing/pullrequest/12709) for KPMG Composite type implementation to help implement composite types for a new search category. 
