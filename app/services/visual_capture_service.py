@@ -515,7 +515,7 @@ class VisualCaptureService:
         export_to_files: bool = False
     ) -> List[Dict[str, Any]]:
         """
-        Capture screenshots for multiple items
+        Capture screenshots for multiple items in parallel
         
         Args:
             items: List of items with 'type', 'id', and 'name' fields
@@ -524,33 +524,85 @@ class VisualCaptureService:
         Returns:
             List of screenshot results
         """
-        results = []
+        if not items:
+            return []
+        
+        print(f"📷 Starting parallel capture for {len(items)} items...")
+        
+        # Create capture tasks for parallel execution
+        capture_tasks = []
         
         for item in items:
             if item.get("type") == "figma":
-                result = await self.capture_figma_file_screenshot(
+                task = self.capture_figma_file_screenshot(
                     item.get("id", ""), 
                     item.get("name", "Figma File"),
                     export_to_file=export_to_files
                 )
             elif item.get("type") == "lucid":
-                result = await self.capture_lucid_diagram_screenshot(
+                task = self.capture_lucid_diagram_screenshot(
                     item.get("id", ""), 
                     item.get("name", "Lucid Diagram"),
                     export_to_file=export_to_files
                 )
             else:
-                result = {
-                    "success": False,
-                    "error": f"Unsupported item type: {item.get('type')}"
-                }
+                # Create a coroutine that returns an error result
+                async def create_error_result():
+                    return {
+                        "success": False,
+                        "error": (
+                            f"Unsupported item type: {item.get('type')}"
+                        )
+                    }
+                task = create_error_result()
             
-            results.append(result)
-            
-            # Add small delay between captures to be respectful
-            await asyncio.sleep(1)
+            capture_tasks.append(task)
         
-        return results
+        # Execute all captures in parallel
+        parallel_msg = f"⚡ Executing {len(capture_tasks)} capture tasks"
+        print(f"{parallel_msg} in parallel...")
+        start_time = time.time()
+        
+        try:
+            # Use asyncio.gather to execute all tasks concurrently
+            results = await asyncio.gather(
+                *capture_tasks, return_exceptions=True
+            )
+            
+            # Process results and handle any exceptions
+            processed_results = []
+            for i, result in enumerate(results):
+                if isinstance(result, Exception):
+                    error_msg = f"⚠️ Capture task {i} failed with exception:"
+                    print(f"{error_msg} {result}")
+                    processed_results.append({
+                        "success": False,
+                        "error": f"Capture failed: {str(result)}"
+                    })
+                else:
+                    processed_results.append(result)
+            
+            processing_time = time.time() - start_time
+            print(f"✅ Parallel capture completed in {processing_time:.2f}s")
+            
+            success_count = sum(
+                1 for r in processed_results if r.get('success')
+            )
+            total_count = len(processed_results)
+            print(f"📊 Success rate: {success_count} / {total_count}")
+            
+            return processed_results
+            
+        except Exception as e:
+            print(f"🚨 Parallel capture failed: {e}")
+            # Return error results for all items
+            return [
+                {
+                    "success": False,
+                    "error": f"Parallel capture error: {str(e)}"
+                }
+                for _ in items
+            ]
     
     async def _save_base64_to_file(
         self,

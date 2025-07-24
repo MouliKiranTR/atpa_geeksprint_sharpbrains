@@ -116,11 +116,10 @@ async def analyze_lucid_architecture_diagrams(request: LucidArchitectureRequest)
         print(f"📊 Analyzing {len(successful_diagrams)} diagrams with {request.reasoning_focus} focus...")
         
         # Perform architecture analysis
-        analysis_result = await enhanced_openarena_service.analyze_architecture_diagrams(
+        analysis_result = await enhanced_openarena_service.analyze_content(
             user_question=request.user_question,
             visual_data=visual_data,
-            reasoning_focus=request.reasoning_focus,
-            include_screenshots=request.include_screenshots
+            analysis_type="architecture"
         )
         
         if analysis_result["success"]:
@@ -195,11 +194,10 @@ async def analyze_lucid_metadata_only(request: LucidArchitectureRequest):
                 })
         
         # Perform metadata-only analysis
-        analysis_result = await enhanced_openarena_service.analyze_architecture_diagrams(
+        analysis_result = await enhanced_openarena_service.analyze_content(
             user_question=request.user_question,
             visual_data=visual_data,
-            reasoning_focus=request.reasoning_focus,
-            include_screenshots=False  # No screenshots for metadata-only
+            analysis_type="architecture"
         )
         
         if analysis_result["success"]:

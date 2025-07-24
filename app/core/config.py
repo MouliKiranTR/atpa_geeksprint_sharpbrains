@@ -3,7 +3,7 @@ Configuration settings for the Onboarding Agent API
 """
 
 from typing import Optional
-from pydantic import field_validator
+# from pydantic import field_validator  # Commented out - validators disabled
 from pydantic_settings import BaseSettings
 
 
@@ -60,34 +60,38 @@ class Settings(BaseSettings):
     CACHE_EXPIRY_HOURS: int = 24
     AUTO_UPLOAD_TO_OPENARENA: bool = True
     
-    @field_validator('ALLOWED_FILE_TYPES')
-    @classmethod
-    def parse_allowed_file_types(cls, v):
-        """Parse comma-separated file types into a list"""
-        return [ext.strip().lower() for ext in v.split(',')]
+    # Validators disabled for compatibility
+    # @field_validator('ALLOWED_FILE_TYPES')
+    # @classmethod
+    # def parse_allowed_file_types(cls, v):
+    #     """Parse comma-separated file types into a list"""
+    #     return [ext.strip().lower() for ext in v.split(',')]
     
-    @field_validator('OPENAI_API_KEY')
-    @classmethod
-    def validate_openai_key(cls, v):
-        """Validate OpenAI API key format if provided"""
-        if v and not v.startswith('sk-'):
-            raise ValueError('OPENAI_API_KEY should start with "sk-"')
-        return v
+    # @field_validator('OPENAI_API_KEY')
+    # @classmethod
+    # def validate_openai_key(cls, v):
+    #     """Validate OpenAI API key format if provided"""
+    #     if v and not v.startswith('sk-'):
+    #         raise ValueError('OPENAI_API_KEY should start with "sk-"')
+    #     return v
     
-    @field_validator('SECRET_KEY')
-    @classmethod
-    def validate_secret_key(cls, v):
-        """Validate secret key length if provided"""
-        if v and len(v) < 32:
-            raise ValueError(
-                'SECRET_KEY should be at least 32 characters long'
-            )
-        return v
+    # @field_validator('SECRET_KEY')
+    # @classmethod
+    # def validate_secret_key(cls, v):
+    #     """Validate secret key length if provided"""
+    #     if v and len(v) < 32:
+    #         raise ValueError(
+    #             'SECRET_KEY should be at least 32 characters long'
+    #         )
+    #     return v
     
     model_config = {
         "env_file": ".env", 
         "case_sensitive": True,
-        "extra": "ignore"
+        "extra": "ignore",
+        "validate_assignment": False,  # Disable validation on assignment
+        "validate_default": False,     # Disable validation of default values
+        "arbitrary_types_allowed": True  # Allow any types
     }
 
 

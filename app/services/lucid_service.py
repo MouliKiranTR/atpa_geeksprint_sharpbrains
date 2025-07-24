@@ -184,8 +184,6 @@ class LucidService:
                 response.raise_for_status()
                 
                 data = response.json()
-                print(f"DEBUG: Search API response: {data}")
-                
                 # Handle case where API returns list directly instead of dict
                 if isinstance(data, list):
                     # If data is a list, assume it's the documents list
@@ -202,14 +200,10 @@ class LucidService:
                         f"Unexpected API response format: {type(data)}"
                     )
                 
-                print(f"DEBUG: Found {len(documents_list)} docs in response")
-                print(f"DEBUG: Total: {total_count}, Has more: {has_more}")
                 
                 # Parse response and convert to our schema
                 documents = []
                 for i, doc_data in enumerate(documents_list):
-                    print(f"DEBUG: Doc {i}: {doc_data}")
-                    
                     # Ensure doc_data is a dictionary
                     if not isinstance(doc_data, dict):
                         print(f"DEBUG: Skip doc {i} - not dict")
@@ -217,16 +211,13 @@ class LucidService:
                     
                     # Check document ID (Lucid API uses 'documentId')
                     doc_id = doc_data.get("documentId")
-                    print(f"DEBUG: Doc {i} ID: {doc_id} ({type(doc_id)})")
                     
                     if not doc_id:
-                        print(f"DEBUG: Skip doc {i} - no documentId")
                         continue
                     
                     # Convert ID to string if it's not already
                     if not isinstance(doc_id, str):
                         doc_id = str(doc_id)
-                        print(f"DEBUG: Converted ID: {doc_id}")
                     
                     # Handle parent folder ID (convert to string if needed)
                     parent_id = doc_data.get("parent")
@@ -464,11 +455,6 @@ class LucidService:
         else:
             headers["Accept"] = "image/png"  # Default to PNG
         
-        print(f"DEBUG: Exporting document {document_id} as {format}")
-        print(f"DEBUG: URL: {url}")
-        print(f"DEBUG: Params: {params}")
-        print(f"DEBUG: Headers: {headers}")
-        
         async with httpx.AsyncClient(verify=False) as client:
             try:
                 response = await client.get(
@@ -477,9 +463,6 @@ class LucidService:
                     params=params,
                     timeout=60.0  # Longer timeout for image export
                 )
-                
-                print(f"DEBUG: Export response status: {response.status_code}")
-                print(f"DEBUG: Export response headers: {dict(response.headers)}")
                 
                 response.raise_for_status()
                 
@@ -535,8 +518,6 @@ class LucidService:
                     
             except httpx.HTTPStatusError as e:
                 status_code = e.response.status_code
-                print(f"DEBUG: HTTPStatusError - Status: {status_code}")
-                print(f"DEBUG: Response text: {e.response.text}")
                 
                 error_msg = f"Lucid export failed: {status_code}"
                 if status_code == 401:
@@ -554,13 +535,11 @@ class LucidService:
                 }
                 
             except httpx.RequestError as e:
-                print(f"DEBUG: RequestError: {str(e)}")
                 return {
                     "success": False,
                     "error": f"Failed to connect to Lucid API: {str(e)}"
                 }
             except Exception as e:
-                print(f"DEBUG: Unexpected error: {str(e)}")
                 return {
                     "success": False,
                     "error": f"Unexpected error during export: {str(e)}"
@@ -568,4 +547,4 @@ class LucidService:
 
 
 # Global instance
-lucid_service = LucidService() if settings.LUCID_API_KEY else None 
+lucid_service = LucidService() if settings.LUCID_API_KEY else None

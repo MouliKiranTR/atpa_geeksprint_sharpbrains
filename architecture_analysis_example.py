@@ -84,11 +84,10 @@ async def analyze_lucid_architecture_example():
     print(f"📐 Lucid Diagrams to analyze: {len(lucid_visual_data)}")
     
     # Analyze with comprehensive reasoning focus
-    result = await enhanced_openarena_service.analyze_architecture_diagrams(
+    result = await enhanced_openarena_service.analyze_content(
         user_question=user_question,
         visual_data=lucid_visual_data,
-        reasoning_focus="comprehensive",
-        include_screenshots=True
+        analysis_type="architecture"
     )
     
     # Process results
@@ -165,11 +164,10 @@ async def analyze_specific_lucid_diagram_types():
         print(f"\n🎯 Scenario {i}: {scenario['focus'].upper()} Analysis")
         print(f"📊 Diagram: {scenario['diagram_data']['diagram_title']}")
         
-        result = await enhanced_openarena_service.analyze_architecture_diagrams(
+        result = await enhanced_openarena_service.analyze_content(
             user_question=scenario['question'],
             visual_data=[scenario['diagram_data']],
-            reasoning_focus=scenario['focus'],
-            include_screenshots=False  # Using metadata only for this demo
+            analysis_type="architecture"
         )
         
         if result["success"]:
@@ -231,11 +229,10 @@ async def lucid_metadata_only_analysis():
     
     print("\n🏗️ Lucid Metadata-Only Analysis...")
     
-    result = await enhanced_openarena_service.analyze_architecture_diagrams(
+    result = await enhanced_openarena_service.analyze_content(
         user_question=user_question,
         visual_data=metadata_only_data,
-        reasoning_focus="comprehensive",
-        include_screenshots=False
+        analysis_type="architecture"
     )
     
     if result["success"]:
