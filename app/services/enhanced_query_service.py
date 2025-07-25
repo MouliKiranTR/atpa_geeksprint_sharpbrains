@@ -198,29 +198,208 @@ class EnhancedQueryService:
             return {}
 
     async def _search_wiki_content(self, query: str) -> Dict[str, Any]:
-        """Search wiki documents based on query"""
-        print(f"Searching wiki for {query}")
+        """Enhanced wiki search with better query processing and relevance scoring"""
+        print(f"🔍 Enhanced wiki search for: {query}")
         try:
-            # Remove await - search method is not async
-            search_terms = query.split()
-            wiki_results = self.wiki_service.search(search_terms)
+            # Generate search query variations for better coverage
+            enhanced_queries = self._generate_search_variations(query)
 
-            # wiki_results is a dict, not a list, so wrap it in a list
-            return {
-                "wiki_documents": [wiki_results] if wiki_results else [],
-                "wiki_search_meta": {
-                    "total_count": (
-                        wiki_results.get("files_with_matches", 0) if wiki_results else 0
-                    ),
-                    "total_matches": (
-                        wiki_results.get("total_matches", 0) if wiki_results else 0
-                    ),
-                    "search_query": query,
-                },
-            }
-        except Exception as e:
-            print(f"Error searching wiki for {query}: {str(e)}")
+            all_results = []
+            for search_query in enhanced_queries:
+                search_terms = search_query.split()
+                if search_terms:
+                    result = self.wiki_service.search(search_terms)
+                    if result and result.get("contents"):
+                        all_results.append(
+                            {
+                                "query": search_query,
+                                "result": result,
+                                "relevance_score": self._calculate_wiki_relevance(
+                                    query, result
+                                ),
+                            }
+                        )
+
+            # Combine and rank results by relevance
+            combined_results = self._combine_wiki_search_results(all_results)
+
+            if combined_results and combined_results.get("contents"):
+                print(f"✅ Wiki search found meaningful content for: {query}")
+                return {
+                    "wiki_documents": [combined_results],
+                    "wiki_search_meta": {
+                        "original_query": query,
+                        "enhanced_queries": enhanced_queries,
+                        "total_sources": len(all_results),
+                        "confidence": combined_results.get("confidence", 0.5),
+                        "files_with_matches": combined_results.get(
+                            "files_with_matches", 0
+                        ),
+                        "total_matches": combined_results.get("total_matches", 0),
+                        "search_query": query,
+                    },
+                }
+
+            print(f"❌ Wiki search found no meaningful content for: {query}")
             return {}
+
+        except Exception as e:
+            print(f"❌ Wiki search error for '{query}': {str(e)}")
+            return {}
+
+    def _generate_search_variations(self, query: str) -> List[str]:
+        """Generate search query variations for better wiki coverage"""
+        variations = [query]
+        query_lower = query.lower()
+
+        # Add technical variations
+        if "git" in query_lower:
+            variations.extend(
+                [
+                    query.replace("git", "version control"),
+                    query + " workflow",
+                    query + " best practices",
+                    query + " repository",
+                ]
+            )
+
+        # Add process variations
+        if "convention" in query_lower or "standard" in query_lower:
+            variations.extend(
+                [
+                    query.replace("convention", "guideline"),
+                    query.replace("standard", "policy"),
+                    query + " procedure",
+                    query + " documentation",
+                ]
+            )
+
+        # Add code-related variations
+        if any(word in query_lower for word in ["code", "coding", "development"]):
+            variations.extend(
+                [
+                    query + " best practices",
+                    query + " guidelines",
+                    query + " standards",
+                    query.replace("code", "development"),
+                ]
+            )
+
+        # Add architecture variations
+        if any(word in query_lower for word in ["architecture", "design", "system"]):
+            variations.extend(
+                [
+                    query + " diagram",
+                    query + " implementation",
+                    query + " components",
+                    query.replace("architecture", "design"),
+                ]
+            )
+
+        # Add deployment variations
+        if any(
+            word in query_lower for word in ["deploy", "deployment", "infrastructure"]
+        ):
+            variations.extend(
+                [
+                    query + " pipeline",
+                    query + " automation",
+                    query + " process",
+                    query.replace("deploy", "release"),
+                ]
+            )
+
+        return list(set(variations))  # Remove duplicates
+
+    def _calculate_wiki_relevance(
+        self, original_query: str, search_result: Dict[str, Any]
+    ) -> float:
+        """Calculate relevance score for wiki search results"""
+        if not search_result or not search_result.get("contents"):
+            return 0.0
+
+        relevance = 0.0
+        content = search_result.get("contents", "").lower()
+        query_words = set(original_query.lower().split())
+
+        # Content length factor (prefer substantial content)
+        content_length = len(content)
+        if content_length > 500:
+            relevance += 0.3
+        elif content_length > 200:
+            relevance += 0.2
+        elif content_length > 100:
+            relevance += 0.1
+
+        # Keyword match factor
+        content_words = set(content.split())
+        match_ratio = len(query_words & content_words) / max(len(query_words), 1)
+        relevance += match_ratio * 0.4
+
+        # Technical content indicators
+        technical_terms = [
+            "implementation",
+            "configuration",
+            "setup",
+            "procedure",
+            "workflow",
+            "guideline",
+            "standard",
+            "policy",
+            "best practice",
+            "example",
+        ]
+        if any(term in content for term in technical_terms):
+            relevance += 0.2
+
+        # File metadata factors
+        if search_result.get("files_with_matches", 0) > 1:
+            relevance += 0.1  # Multiple relevant files
+
+        return min(relevance, 1.0)
+
+    def _combine_wiki_search_results(
+        self, results: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Combine and rank wiki search results by relevance"""
+        if not results:
+            return {}
+
+        # Sort by relevance score
+        sorted_results = sorted(
+            results, key=lambda x: x.get("relevance_score", 0), reverse=True
+        )
+
+        # Take the best result as base
+        best_result = sorted_results[0]["result"]
+
+        # Combine contents from multiple sources if relevant
+        combined_content = best_result.get("contents", "")
+        files_with_matches = best_result.get("files_with_matches", 0)
+        total_matches = best_result.get("total_matches", 0)
+
+        # Add supplementary content from other highly relevant results
+        for result_data in sorted_results[1:3]:  # Top 3 results max
+            if result_data["relevance_score"] > 0.5:  # Only high-relevance results
+                additional_content = result_data["result"].get("contents", "")
+                if additional_content and additional_content not in combined_content:
+                    combined_content += (
+                        f"\n\n--- Additional Source ---\n{additional_content}"
+                    )
+                    files_with_matches += result_data["result"].get(
+                        "files_with_matches", 0
+                    )
+                    total_matches += result_data["result"].get("total_matches", 0)
+
+        return {
+            "contents": combined_content,
+            "files_with_matches": files_with_matches,
+            "total_matches": total_matches,
+            "confidence": sorted_results[0]["relevance_score"],
+            "sources_combined": len(
+                [r for r in sorted_results if r["relevance_score"] > 0.5]
+            ),
+        }
 
     def _determine_architecture_reasoning_focus(self, user_question: str) -> str:
         """
