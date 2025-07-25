@@ -3,41 +3,41 @@ Enhanced OpenArena Service for visual content analysis
 """
 
 import json
-from typing import Dict, Any, List
 from datetime import datetime
+from typing import Any, Dict, List
+
 from websockets.sync.client import connect
+
 from app.utils.openarena_authenticator import OpenArenaAuthenticator
 
 
 class EnhancedOpenArenaService:
     """Enhanced service for visual content analysis using OpenArena"""
-    
+
     def __init__(self):
         self.auth = OpenArenaAuthenticator()
         self.workflow_id = "592081d1-0a6e-4b5f-93b1-a08a674bf4bc"
-        self.base_url = (
-            "https://aiopenarena.gcs.int.thomsonreuters.com/v1/inference"
-        )
-    
+        self.base_url = "https://aiopenarena.gcs.int.thomsonreuters.com/v1/inference"
+
     def _create_unified_analysis_prompt(
-        self, 
+        self,
         user_question: str,
         visual_data: List[Dict[str, Any]],
-        analysis_type: str = "general"
+        analysis_type: str = "general",
     ) -> str:
         """
         Create a unified prompt for any type of visual content analysis
-        
+
         Args:
             user_question: User's original question
             visual_data: List of visual content with metadata
-            analysis_type: Type of analysis (general, design, workflow, 
+            analysis_type: Type of analysis (general, design, workflow,
                           architecture, etc.)
-            
+
         Returns:
             Formatted prompt for OpenArena
         """
-        
+
         # Base system context
         base_context = """
 You are an expert Onboarding Knowledge Agent designed to help new team 
@@ -103,77 +103,67 @@ QUALITY STANDARDS:
 - Structured presentation with visual aids when helpful
 - Cross-references to related systems and processes
         """
-        
+
         # Create context about the visual content
         visual_context = "\n\nVISUAL CONTENT ANALYSIS:\n"
-        visual_context += "="*50 + "\n\n"
-        
+        visual_context += "=" * 50 + "\n\n"
+
         for i, item in enumerate(visual_data, 1):
             if not item.get("success"):
-                error_msg = item.get('error', 'Unknown error')
-                visual_context += (
-                    f"Item {i}: Failed to capture - {error_msg}\n\n"
-                )
+                error_msg = item.get("error", "Unknown error")
+                visual_context += f"Item {i}: Failed to capture - {error_msg}\n\n"
                 continue
-                
+
             source = item.get("source", "unknown")
-            
+
             if source == "figma":
                 visual_context += f"FIGMA FILE {i}:\n"
-                file_name = item.get('file_name', 'Unknown')
+                file_name = item.get("file_name", "Unknown")
                 visual_context += f"- File Name: {file_name}\n"
-                file_key = item.get('file_key', 'Unknown')
+                file_key = item.get("file_key", "Unknown")
                 visual_context += f"- File Key: {file_key}\n"
-                
+
                 metadata = item.get("metadata", {})
                 if metadata:
-                    doc_name = metadata.get('document_name', 'N/A')
+                    doc_name = metadata.get("document_name", "N/A")
                     visual_context += f"- Document Name: {doc_name}\n"
-                    last_mod = metadata.get('last_modified', 'N/A')
+                    last_mod = metadata.get("last_modified", "N/A")
                     visual_context += f"- Last Modified: {last_mod}\n"
-                    version = metadata.get('version', 'N/A')
+                    version = metadata.get("version", "N/A")
                     visual_context += f"- Version: {version}\n"
-                    pages = metadata.get('pages', 'N/A')
+                    pages = metadata.get("pages", "N/A")
                     visual_context += f"- Number of Pages: {pages}\n"
-                    description = metadata.get('description', 'N/A')
+                    description = metadata.get("description", "N/A")
                     visual_context += f"- Description: {description}\n"
-                
-                capture_method = item.get('capture_method', 'Unknown')
+
+                capture_method = item.get("capture_method", "Unknown")
                 visual_context += f"- Capture Method: {capture_method}\n"
-                screenshot_available = (
-                    'Yes' if item.get('screenshot_base64') else 'No'
-                )
-                visual_context += (
-                    f"- Screenshot Available: {screenshot_available}\n"
-                )
-                
+                screenshot_available = "Yes" if item.get("screenshot_base64") else "No"
+                visual_context += f"- Screenshot Available: {screenshot_available}\n"
+
             elif source == "lucid":
                 visual_context += f"LUCID DIAGRAM {i}:\n"
-                diagram_title = item.get('diagram_title', 'Unknown')
+                diagram_title = item.get("diagram_title", "Unknown")
                 visual_context += f"- Diagram Title: {diagram_title}\n"
-                diagram_id = item.get('diagram_id', 'Unknown')
+                diagram_id = item.get("diagram_id", "Unknown")
                 visual_context += f"- Diagram ID: {diagram_id}\n"
-                
+
                 metadata = item.get("metadata", {})
                 if metadata:
-                    export_id = metadata.get('export_id', 'N/A')
+                    export_id = metadata.get("export_id", "N/A")
                     visual_context += f"- Export ID: {export_id}\n"
-                    format_type = metadata.get('format', 'N/A')
+                    format_type = metadata.get("format", "N/A")
                     visual_context += f"- Format: {format_type}\n"
-                    scale = metadata.get('scale', 'N/A')
+                    scale = metadata.get("scale", "N/A")
                     visual_context += f"- Scale: {scale}\n"
-                
-                capture_method = item.get('capture_method', 'Unknown')
+
+                capture_method = item.get("capture_method", "Unknown")
                 visual_context += f"- Capture Method: {capture_method}\n"
-                screenshot_available = (
-                    'Yes' if item.get('screenshot_base64') else 'No'
-                )
-                visual_context += (
-                    f"- Screenshot Available: {screenshot_available}\n"
-                )
-            
+                screenshot_available = "Yes" if item.get("screenshot_base64") else "No"
+                visual_context += f"- Screenshot Available: {screenshot_available}\n"
+
             visual_context += "\n"
-        
+
         # Analysis type specific instructions
         type_instructions = {
             "design": """
@@ -186,7 +176,6 @@ QUALITY STANDARDS:
             - If no visual content available, suggest design approaches and 
               best practices
             """,
-            
             "workflow": """
             WORKFLOW ANALYSIS FOCUS:
             - Map out process flows and decision points
@@ -197,7 +186,6 @@ QUALITY STANDARDS:
             - If no visual content available, recommend workflow 
               documentation strategies
             """,
-            
             "integration": """
             INTEGRATION ANALYSIS FOCUS:
             - Identify data flows and system connections
@@ -208,7 +196,6 @@ QUALITY STANDARDS:
             - If no visual content available, suggest architecture 
               documentation approaches
             """,
-
             "architecture": """
             ARCHITECTURE ANALYSIS FOCUS:
             - Complete component inventory and relationship mapping
@@ -220,7 +207,6 @@ QUALITY STANDARDS:
             - Architectural debt and technical risk evaluation
             - Modernization and refactoring recommendations
             """,
-            
             "general": """
             GENERAL ANALYSIS FOCUS:
             - Provide comprehensive overview of the visual content
@@ -230,13 +216,13 @@ QUALITY STANDARDS:
             - Offer relevant recommendations and next steps
             - If no visual content available, provide guidance on content 
               creation
-            """
+            """,
         }
-        
+
         analysis_instruction = type_instructions.get(
             analysis_type, type_instructions["general"]
         )
-        
+
         # Construct final prompt
         final_prompt = f"""
         {base_context}
@@ -259,53 +245,159 @@ QUALITY STANDARDS:
         
         Please provide a comprehensive analysis addressing the user's question.
         """
-        
+
         return final_prompt.strip()
-    
+
+    def create_enhanced_analysis_prompt_with_wiki(
+        self,
+        user_question: str,
+        visual_data: List[Dict[str, Any]],
+        wiki_context: str = None,
+        analysis_type: str = "general",
+    ) -> str:
+        """
+        Create enhanced prompt that combines visual and wiki documentation analysis
+
+        Args:
+            user_question: User's original question
+            visual_data: List of visual content with metadata
+            wiki_context: Wiki documentation context
+            analysis_type: Type of analysis to perform
+
+        Returns:
+            Enhanced prompt for comprehensive analysis
+        """
+
+        # Base visual analysis prompt
+        base_prompt = self._create_unified_analysis_prompt(
+            user_question, visual_data, analysis_type
+        )
+
+        # Enhanced context integration if wiki content is available
+        if wiki_context and wiki_context.strip():
+            context_integration = f"""
+            
+            SUPPLEMENTARY DOCUMENTATION CONTEXT:
+            =====================================
+            {wiki_context}
+            
+            CROSS-REFERENCE ANALYSIS INSTRUCTIONS:
+            - Compare visual elements with documented processes or architectures
+            - Identify discrepancies between visual and written documentation
+            - Highlight areas where visual content provides additional insights
+            - Note gaps where documentation could be enhanced with visual examples
+            - Suggest documentation updates based on visual evidence
+            - Cross-reference terminology and concepts between sources
+            """
+        else:
+            context_integration = ""
+
+        # Enhanced analysis framework
+        analysis_framework = """
+        
+        COMPREHENSIVE ANALYSIS FRAMEWORK:
+        ================================
+        
+        1. **Visual Content Summary**
+           - Describe what you observe in detail
+           - Identify key components, relationships, and flows
+           - Note any text, labels, or annotations visible
+           - Categorize the type of visual content (architecture, process, UI, etc.)
+        
+        2. **Technical Analysis**
+           - System architecture or process flow interpretation
+           - Technology stack identification and integration points
+           - Data flow analysis and dependencies
+           - Performance considerations and scalability factors
+           - Security implications and compliance aspects
+        
+        3. **Business Context Integration**
+           - Business process implications and workflow efficiency
+           - Stakeholder impact analysis and responsibility mapping
+           - Cost-benefit considerations for implementations
+           - Risk assessment and mitigation strategies
+           - Compliance and governance requirements
+        
+        4. **Documentation Cross-Reference**
+           - Alignment with existing documentation standards
+           - Identification of documentation gaps or inconsistencies
+           - Recommendations for documentation improvements
+           - Version control and change management considerations
+        
+        5. **Actionable Insights and Recommendations**
+           - Implementation roadmap and next steps
+           - Resource requirements and timeline estimates
+           - Best practices alignment and optimization opportunities
+           - Testing and validation approaches
+           - Monitoring and maintenance considerations
+        
+        6. **Knowledge Transfer Support**
+           - Learning path recommendations for new team members
+           - Key concepts and terminology explanations
+           - Related systems and processes to understand
+           - Subject matter experts and contact information
+           - Training materials and reference documentation
+        """
+
+        final_enhanced_prompt = f"""
+        {base_prompt}
+        {context_integration}
+        {analysis_framework}
+        
+        USER QUESTION: {user_question}
+        
+        Please provide a comprehensive analysis that directly addresses the user's question while 
+        incorporating insights from both visual and documented sources. Structure your response 
+        clearly using the framework above and provide specific, actionable recommendations that 
+        support effective onboarding and knowledge transfer.
+        
+        Focus on creating connections between visual and textual information to provide a 
+        holistic understanding that enables effective decision-making and implementation.
+        """
+
+        return final_enhanced_prompt.strip()
+
     def _prepare_visual_content_for_prompt(
-        self, 
-        visual_data: List[Dict[str, Any]]
+        self, visual_data: List[Dict[str, Any]]
     ) -> str:
         """
         Prepare visual content for inclusion in the prompt
-        
+
         Args:
             visual_data: List of visual content data
-            
+
         Returns:
             Formatted visual content section for prompt
         """
         if not visual_data:
             return ""
-            
+
         visual_content_section = "\n\nVISUAL CONTENT:\n"
-        
+
         for i, item in enumerate(visual_data, 1):
             if not item.get("success"):
                 continue
-                
+
             # Add base64 image data if available
             base64_data = item.get("screenshot_base64")
             if base64_data:
                 filename = f"{item.get('source', 'unknown')}_{i}"
                 visual_content_section += (
-                    f"\n{filename}: [Image data: "
-                    f"{len(base64_data)} characters]\n"
+                    f"\n{filename}: [Image data: {len(base64_data)} characters]\n"
                 )
                 visual_content_section += f"Base64: {base64_data[:100]}...\n"
-        
+
         return visual_content_section
-    
+
     def _query_openarena_websocket(
-        self, 
-        final_prompt: str
+        self, final_prompt: str
     ) -> tuple[str, Dict[str, Any]]:
         """
         Query OpenArena using WebSocket connection
-        
+
         Args:
             final_prompt: The complete prompt to send
-            
+
         Returns:
             Tuple of (answer, cost_tracker)
         """
@@ -314,33 +406,33 @@ QUALITY STANDARDS:
             f"wss://wymocw0zke.execute-api.us-east-1.amazonaws.com/prod/"
             f"?Authorization={token}"
         )
-        
+
         message = {
             "action": "SendMessage",
             "workflow_id": self.workflow_id,
             "query": final_prompt,
-            "is_persistence_allowed": True
+            "is_persistence_allowed": True,
         }
-        
+
         print("🔗 Connecting to OpenArena via WebSocket...")
         ws = connect(url)
         ws.send(json.dumps(message))
-        
+
         answer = ""
         cost_tracker = {}
         eof = False
-        
+
         while not eof:
             message = ws.recv()
             message_data = json.loads(message)
-            
+
             for model, value in message_data.items():
                 if "answer" in value:
                     answer += value["answer"]
                 elif "cost_track" in value:
-                    cost_tracker = value['cost_track']
+                    cost_tracker = value["cost_track"]
                     eof = True
-        
+
         ws.close()
         return answer, cost_tracker
 
@@ -348,65 +440,60 @@ QUALITY STANDARDS:
         self,
         user_question: str,
         visual_data: List[Dict[str, Any]],
-        analysis_type: str = "general"
+        analysis_type: str = "general",
     ) -> Dict[str, Any]:
         """
         Unified method to analyze visual content using OpenArena
-        
+
         Args:
             user_question: User's question about the visual content
             visual_data: List of captured visual content from all sources
             analysis_type: Type of analysis to perform
-            
+
         Returns:
             Analysis result from OpenArena
         """
         try:
             # Get authentication token
             openarena_token = self.auth.authenticate_and_get_token()
-            
+
             if not openarena_token:
                 return {
                     "success": False,
-                    "error": "Failed to authenticate with OpenArena"
+                    "error": "Failed to authenticate with OpenArena",
                 }
-            
+
             # Create the unified analysis prompt
             base_prompt = self._create_unified_analysis_prompt(
                 user_question, visual_data, analysis_type
             )
-            
+
             # Add visual content to prompt if available
-            visual_content = self._prepare_visual_content_for_prompt(
-                visual_data
-            )
+            visual_content = self._prepare_visual_content_for_prompt(visual_data)
             final_prompt = base_prompt + visual_content
-            
+
             print(f"📊 Processing {len(visual_data)} visual items")
             print(f"🎯 Analysis type: {analysis_type}")
-            
+
             # Make single call to OpenArena
-            answer, cost_tracker = self._query_openarena_websocket(
-                final_prompt
-            )
-            
+            answer, cost_tracker = self._query_openarena_websocket(final_prompt)
+
             if answer:
-                cost = cost_tracker.get('total_cost', None)
-                
+                cost = cost_tracker.get("total_cost", None)
+
                 print("✅ OpenArena Analysis Complete")
                 print(f"💲 Estimated Cost: {cost}")
-                
+
                 # Format as proper markdown for frontend
                 markdown_analysis = self._format_as_markdown(
                     answer, user_question, analysis_type
                 )
-                
+
                 # Count processed items
-                successful_items = len([
-                    item for item in visual_data 
-                    if item.get("success")
-                ])
-                
+                successful_items = len(
+                    [item for item in visual_data if item.get("success")]
+                )
+
                 return {
                     "success": True,
                     "analysis": markdown_analysis,
@@ -414,110 +501,123 @@ QUALITY STANDARDS:
                     "cost": cost,
                     "analysis_type": analysis_type,
                     "visual_items_processed": len(visual_data),
-                    "successful_items": successful_items
+                    "successful_items": successful_items,
                 }
             else:
                 return {
                     "success": False,
-                    "error": "No response received from OpenArena"
+                    "error": "No response received from OpenArena",
                 }
-                
+
         except Exception as e:
             print(f"🚨 Failed to analyze content: {e}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            return {"success": False, "error": str(e)}
 
     def determine_analysis_type(self, user_question: str) -> str:
         """
         Determine the appropriate analysis type based on user question
-        
+
         Args:
             user_question: User's question
-            
+
         Returns:
             Analysis type string
         """
         question_lower = user_question.lower()
-        
+
         # Architecture-related keywords
         architecture_keywords = [
-            "architecture", "system", "component", "integration", "data flow",
-            "database", "service", "endpoint", "api", "technical", "design",
-            "structure", "pattern"
+            "architecture",
+            "system",
+            "component",
+            "integration",
+            "data flow",
+            "database",
+            "service",
+            "endpoint",
+            "api",
+            "technical",
+            "design",
+            "structure",
+            "pattern",
         ]
-        
+
         # Design-related keywords
         design_keywords = [
-            "design", "ui", "ux", "interface", "layout", "color", "typography",
-            "visual", "style", "component", "accessibility", "usability"
+            "design",
+            "ui",
+            "ux",
+            "interface",
+            "layout",
+            "color",
+            "typography",
+            "visual",
+            "style",
+            "component",
+            "accessibility",
+            "usability",
         ]
-        
+
         # Workflow-related keywords
         workflow_keywords = [
-            "workflow", "process", "flow", "step", "procedure", "journey",
-            "path", "sequence", "order", "stages", "phases"
+            "workflow",
+            "process",
+            "flow",
+            "step",
+            "procedure",
+            "journey",
+            "path",
+            "sequence",
+            "order",
+            "stages",
+            "phases",
         ]
-        
+
         # Check for keyword matches (architecture first as it's most specific)
-        if any(
-            keyword in question_lower for keyword in architecture_keywords
-        ):
+        if any(keyword in question_lower for keyword in architecture_keywords):
             return "architecture"
         elif any(keyword in question_lower for keyword in design_keywords):
             return "design"
-        elif any(
-            keyword in question_lower for keyword in workflow_keywords
-        ):
+        elif any(keyword in question_lower for keyword in workflow_keywords):
             return "workflow"
         else:
             return "general"
 
     def _format_as_markdown(
-        self, 
-        content: str, 
-        user_question: str, 
-        analysis_type: str
+        self, content: str, user_question: str, analysis_type: str
     ) -> str:
         """
         Format the analysis content as proper markdown for frontend display
-        
+
         Args:
             content: Raw analysis content
             user_question: Original user question
             analysis_type: Type of analysis performed
-            
+
         Returns:
             Properly formatted markdown content
         """
-        
+
         # Clean up and ensure proper markdown formatting
         markdown_content = content.strip()
-        
+
         # Ensure proper spacing around headers
         import re
-        
+
         # Fix header spacing
-        markdown_content = re.sub(r'\n(#{1,6})', r'\n\n\1', markdown_content)
+        markdown_content = re.sub(r"\n(#{1,6})", r"\n\n\1", markdown_content)
         markdown_content = re.sub(
-            r'(#{1,6}[^\n]+)\n(?!\n)', 
-            r'\1\n\n', 
-            markdown_content
+            r"(#{1,6}[^\n]+)\n(?!\n)", r"\1\n\n", markdown_content
         )
-        
+
         # Ensure proper list formatting
-        markdown_content = re.sub(
-            r'\n(-|\*|\d+\.)\s', 
-            r'\n\n\1 ', 
-            markdown_content
-        )
-        
+        markdown_content = re.sub(r"\n(-|\*|\d+\.)\s", r"\n\n\1 ", markdown_content)
+
         # Fix multiple consecutive newlines
-        markdown_content = re.sub(r'\n{3,}', '\n\n', markdown_content)
-        
+        markdown_content = re.sub(r"\n{3,}", "\n\n", markdown_content)
+
         # Add metadata section at the top if not present
-        if not markdown_content.startswith('# '):
+        if not markdown_content.startswith("# "):
             title = self._generate_title(analysis_type)
             metadata_section = f"""# {title}
 
@@ -529,33 +629,33 @@ QUALITY STANDARDS:
 
 """
             markdown_content = metadata_section + markdown_content
-        
+
         # Add footer with helpful information
         footer = self._generate_markdown_footer(analysis_type)
         markdown_content += footer
-        
+
         return markdown_content.strip()
-    
+
     def _generate_title(self, analysis_type: str) -> str:
         """Generate an appropriate title for the analysis"""
-        
+
         titles = {
             "architecture": "🏗️ Architecture Analysis",
-            "design": "🎨 Design Analysis", 
+            "design": "🎨 Design Analysis",
             "workflow": "⚡ Workflow Analysis",
             "integration": "🔗 Integration Analysis",
-            "general": "📊 Visual Content Analysis"
+            "general": "📊 Visual Content Analysis",
         }
-        
+
         return titles.get(analysis_type, "📊 Content Analysis")
-    
+
     def _get_current_timestamp(self) -> str:
         """Get current timestamp in readable format"""
         return datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
-    
+
     def _generate_markdown_footer(self, analysis_type: str) -> str:
         """Generate helpful footer information"""
-        
+
         footer = f"""
 
 ---
@@ -577,7 +677,7 @@ Based on this {analysis_type} analysis, consider:
 *Analysis generated by Enhanced OpenArena Service | 
 {self._get_current_timestamp()}*
 """
-        
+
         return footer
 
     def make_openarena_call(self, final_prompt: str) -> str:
@@ -587,4 +687,4 @@ Based on this {analysis_type} analysis, consider:
 
 
 # Create service instance
-enhanced_openarena_service = EnhancedOpenArenaService() 
+enhanced_openarena_service = EnhancedOpenArenaService()
